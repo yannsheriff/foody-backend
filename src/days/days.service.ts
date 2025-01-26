@@ -7,8 +7,24 @@ import { UpdateDayDto } from './dto/update-day.dto';
 export class DaysService {
   constructor(private prisma: PrismaService) {}
 
+  private formatScoreData(data: CreateDayDto | UpdateDayDto): UpdateDayDto {
+    return {
+      ...data,
+      morning_score: data.morning_score ?? null,
+      afternoon_score: data.afternoon_score ?? null,
+      evening_score: data.evening_score ?? null,
+      extra_score: data.extra_score ?? null,
+    };
+  }
+
   async createDay(data: CreateDayDto) {
-    return this.prisma.days.create({ data });
+    const formattedData = {
+      ...data,
+      ...this.formatScoreData(data),
+    };
+    return this.prisma.days.create({
+      data: formattedData,
+    });
   }
 
   async findAll() {
@@ -40,9 +56,10 @@ export class DaysService {
 
   async update(id: number, data: UpdateDayDto) {
     await this.findOne(id);
+    const formattedData = this.formatScoreData(data);
     return this.prisma.days.update({
       where: { id },
-      data,
+      data: formattedData,
     });
   }
 

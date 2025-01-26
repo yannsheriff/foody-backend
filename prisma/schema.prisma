@@ -17,10 +17,10 @@ enum Score {
 model Days {
   id             Int      @id @default(autoincrement())
   user_id        Int
-  morning_score  Score    @default(empty)
-  afternoon_score Score   @default(empty)
-  evening_score  Score    @default(empty)
-  extra_score    Score    @default(empty)
+  morning_score  Score?   @default(empty)
+  afternoon_score Score?  @default(empty)
+  evening_score  Score?   @default(empty)
+  extra_score    Score?   @default(empty)
   date           DateTime @default(now())
 
   @@map("days")
