@@ -60,6 +60,17 @@ export class DaysController {
     return this.daysService.getDaysByUserId(userId);
   }
 
+  @Get('user/:userId/today')
+  @ApiOperation({ summary: "Récupérer ou créer le jour actuel d'un utilisateur" })
+  @ApiParam({ name: 'userId', description: "ID de l'utilisateur" })
+  @ApiResponse({
+    status: 200,
+    description: "Jour actuel de l'utilisateur (créé si inexistant).",
+  })
+  getTodayForUser(@Param('userId', ParseIntPipe) userId: number) {
+    return this.daysService.getOrCreateTodayForUser(userId);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Mettre à jour un jour' })
   @ApiParam({ name: 'id', description: 'ID du jour' })

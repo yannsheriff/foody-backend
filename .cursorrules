@@ -13,6 +13,7 @@ Generate code, corrections, and refactorings that comply with the basic principl
 - Use JSDoc to document public classes and methods.
 - Don't leave blank lines within a function.
 - One export per file.
+- For each modification update swagger if needed
 
 ### Nomenclature
 
