@@ -2,6 +2,7 @@ import { Controller, Post, Body, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { LoginDto } from './dto/login.dto';
+import { LoginResponseDto } from './dto/login-response.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -13,14 +14,7 @@ export class AuthController {
   @ApiResponse({
     status: 200,
     description: 'Connexion réussie',
-    schema: {
-      properties: {
-        access_token: {
-          type: 'string',
-          description: 'JWT Token',
-        },
-      },
-    },
+    type: LoginResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Identifiants invalides' })
   @ApiBody({ type: LoginDto })
