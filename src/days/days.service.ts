@@ -96,6 +96,7 @@ export class DaysService {
         afternoon_score: null,
         evening_score: null,
         extra_score: null,
+        sport: false,
       },
     });
   }

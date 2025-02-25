@@ -50,4 +50,12 @@ export class CreateDayDto {
     example: '2024-01-18T00:00:00.000Z',
   })
   date?: Date;
+
+  @ApiProperty({
+    description: 'Activité sportive effectuée',
+    required: false,
+    default: false,
+    example: true,
+  })
+  sport?: boolean;
 }

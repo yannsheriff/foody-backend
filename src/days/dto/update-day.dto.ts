@@ -37,4 +37,11 @@ export class UpdateDayDto {
     example: 'normal',
   })
   extra_score?: Score | null;
+
+  @ApiProperty({
+    description: 'Activité sportive effectuée',
+    required: false,
+    example: true,
+  })
+  sport?: boolean;
 }

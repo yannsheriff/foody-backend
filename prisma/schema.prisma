@@ -14,6 +14,15 @@ enum Score {
   heavy   @map("3")
 }
 
+model User {
+  id    Int     @id @default(autoincrement())
+  email String  @unique
+  name  String
+  days  Days[]  // Relation nécessaire pour Prisma, même si non utilisée
+
+  @@map("users")
+}
+
 model Days {
   id             Int      @id @default(autoincrement())
   user_id        Int
@@ -21,7 +30,10 @@ model Days {
   afternoon_score Score?  @default(empty)
   evening_score  Score?   @default(empty)
   extra_score    Score?   @default(empty)
+  sport          Boolean  @default(false)
   date           DateTime @default(now())
+  user           User     @relation(fields: [user_id], references: [id])
 
+  @@index([user_id])
   @@map("days")
 } 
