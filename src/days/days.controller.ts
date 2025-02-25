@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   ParseIntPipe,
+  UseGuards,
 } from '@nestjs/common';
 import { DaysService } from './days.service';
 import { CreateDayDto } from './dto/create-day.dto';
@@ -17,10 +18,14 @@ import {
   ApiResponse,
   ApiParam,
   ApiBody,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('days')
 @Controller('days')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT-auth')
 export class DaysController {
   constructor(private readonly daysService: DaysService) {}
 
@@ -61,7 +66,9 @@ export class DaysController {
   }
 
   @Get('user/:userId/today')
-  @ApiOperation({ summary: "Récupérer ou créer le jour actuel d'un utilisateur" })
+  @ApiOperation({
+    summary: "Récupérer ou créer le jour actuel d'un utilisateur",
+  })
   @ApiParam({ name: 'userId', description: "ID de l'utilisateur" })
   @ApiResponse({
     status: 200,

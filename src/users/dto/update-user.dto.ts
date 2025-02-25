@@ -14,4 +14,11 @@ export class UpdateUserDto {
     required: false,
   })
   name?: string;
+
+  @ApiProperty({
+    description: 'Le mot de passe',
+    example: '0000',
+    required: false,
+  })
+  password?: string;
 }
