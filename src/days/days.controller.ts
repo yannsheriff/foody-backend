@@ -21,10 +21,11 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UserGuard } from './guards/user-days.guard';
 
 @ApiTags('days')
 @Controller('days')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, UserGuard)
 @ApiBearerAuth('JWT-auth')
 export class DaysController {
   constructor(private readonly daysService: DaysService) {}

@@ -21,11 +21,12 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UserResponseDto } from './dto/user-response.dto';
+import { UserGuard } from 'src/days/guards/user-days.guard';
 
 @ApiTags('users')
 @Controller('users')
-// @UseGuards(JwtAuthGuard)
-// @ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard, UserGuard)
+@ApiBearerAuth('JWT-auth')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -40,49 +41,49 @@ export class UsersController {
     return this.usersService.create(createUserDto);
   }
 
-  @Get()
-  @ApiOperation({ summary: 'Récupérer tous les utilisateurs' })
-  @ApiResponse({
-    status: 200,
-    description: 'Liste des utilisateurs récupérée.',
-    type: [UserResponseDto],
-  })
-  findAll() {
-    return this.usersService.findAll();
-  }
+  // @Get()
+  // @ApiOperation({ summary: 'Récupérer tous les utilisateurs' })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'Liste des utilisateurs récupérée.',
+  //   type: [UserResponseDto],
+  // })
+  // findAll() {
+  //   return this.usersService.findAll();
+  // }
 
-  @Get(':id')
+  @Get(':userId')
   @ApiOperation({ summary: 'Récupérer un utilisateur par son ID' })
-  @ApiParam({ name: 'id', description: "ID de l'utilisateur" })
+  @ApiParam({ name: 'userId', description: "ID de l'utilisateur" })
   @ApiResponse({
     status: 200,
     description: 'Utilisateur trouvé.',
     type: UserResponseDto,
   })
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('userId', ParseIntPipe) id: number) {
     return this.usersService.findOne(id);
   }
 
-  @Patch(':id')
+  @Patch(':userId')
   @ApiOperation({ summary: 'Mettre à jour un utilisateur' })
-  @ApiParam({ name: 'id', description: "ID de l'utilisateur" })
+  @ApiParam({ name: 'userId', description: "ID de l'utilisateur" })
   @ApiResponse({
     status: 200,
     description: 'Utilisateur mis à jour.',
     type: UserResponseDto,
   })
   update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('userId', ParseIntPipe) id: number,
     @Body() updateUserDto: UpdateUserDto,
   ) {
     return this.usersService.update(id, updateUserDto);
   }
 
-  @Delete(':id')
+  @Delete(':userId')
   @ApiOperation({ summary: 'Supprimer un utilisateur' })
-  @ApiParam({ name: 'id', description: "ID de l'utilisateur" })
+  @ApiParam({ name: 'userId', description: "ID de l'utilisateur" })
   @ApiResponse({ status: 200, description: 'Utilisateur supprimé.' })
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('userId', ParseIntPipe) id: number) {
     return this.usersService.remove(id);
   }
 }
