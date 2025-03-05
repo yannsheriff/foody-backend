@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
+import { CreateUserDto } from '../users/dto/create-user.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -26,6 +27,19 @@ export class AuthController {
     if (!user) {
       throw new UnauthorizedException();
     }
+    return this.authService.login(user);
+  }
+
+  @Post('register')
+  @ApiOperation({ summary: "Inscription d'un nouvel utilisateur" })
+  @ApiResponse({
+    status: 201,
+    description: 'Utilisateur créé et connecté avec succès',
+    type: LoginResponseDto,
+  })
+  @ApiBody({ type: CreateUserDto })
+  async register(@Body() createUserDto: CreateUserDto) {
+    const user = await this.authService.register(createUserDto);
     return this.authService.login(user);
   }
 }

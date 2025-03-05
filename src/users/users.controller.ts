@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Post,
   Body,
   Patch,
   Param,
@@ -10,7 +9,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import {
   ApiTags,
@@ -29,28 +27,6 @@ import { UserGuard } from 'src/days/guards/user-days.guard';
 @ApiBearerAuth('JWT-auth')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
-
-  @Post()
-  @ApiOperation({ summary: 'Créer un nouvel utilisateur' })
-  @ApiResponse({
-    status: 201,
-    description: 'Utilisateur créé avec succès.',
-    type: UserResponseDto,
-  })
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
-  }
-
-  // @Get()
-  // @ApiOperation({ summary: 'Récupérer tous les utilisateurs' })
-  // @ApiResponse({
-  //   status: 200,
-  //   description: 'Liste des utilisateurs récupérée.',
-  //   type: [UserResponseDto],
-  // })
-  // findAll() {
-  //   return this.usersService.findAll();
-  // }
 
   @Get(':userId')
   @ApiOperation({ summary: 'Récupérer un utilisateur par son ID' })
