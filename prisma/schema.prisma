@@ -25,15 +25,16 @@ model User {
 }
 
 model Days {
-  id             Int      @id @default(autoincrement())
-  user_id        Int
-  morning_score  Score?   @default(empty)
-  afternoon_score Score?  @default(empty)
-  evening_score  Score?   @default(empty)
-  extra_score    Score?   @default(empty)
-  sport          Boolean  @default(false)
-  date           DateTime @default(now())
-  user           User     @relation(fields: [user_id], references: [id])
+  id               Int      @id @default(autoincrement())
+  user_id          Int
+  morning_score    Score?   @default(empty)
+  afternoon_score  Score?   @default(empty)
+  evening_score    Score?   @default(empty)
+  extra_score      Score?   @default(empty)
+  sport            Boolean  @default(false)
+  completed_on_time Boolean @default(false)
+  date            DateTime @default(now())
+  user            User     @relation(fields: [user_id], references: [id])
 
   @@index([user_id])
   @@map("days")

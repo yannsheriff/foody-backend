@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDayDto } from './dto/create-day.dto';
 import { UpdateDayDto } from './dto/update-day.dto';
+import { Days, Score } from '@prisma/client';
 
 @Injectable()
 export class DaysService {
@@ -17,13 +18,56 @@ export class DaysService {
     };
   }
 
+  private isToday(date: Date): boolean {
+    const today = new Date();
+    return (
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+    );
+  }
+
+  private areAllMealsCompleted(
+    morning: Score | null,
+    afternoon: Score | null,
+    evening: Score | null,
+  ): boolean {
+    return morning !== null && afternoon !== null && evening !== null;
+  }
+
+  private async handleCompletedOnTime(data: Days) {
+    // Si ce n'est pas aujourd'hui, on garde la valeur existante
+    if (!this.isToday(data.date)) {
+      return data.completed_on_time;
+    }
+
+    // Vérifie si tous les repas sont complétés
+    return this.areAllMealsCompleted(
+      data.morning_score,
+      data.afternoon_score,
+      data.evening_score,
+    );
+  }
+
   async createDay(data: CreateDayDto) {
     const formattedData = {
       ...data,
       ...this.formatScoreData(data),
     };
-    return this.prisma.days.create({
-      data: formattedData,
+    const day = await this.prisma.days.create({
+      data: {
+        ...formattedData,
+        completed_on_time: false,
+      },
+    });
+
+    const completed_on_time = await this.handleCompletedOnTime(day);
+
+    return this.prisma.days.update({
+      where: { id: day.id },
+      data: {
+        completed_on_time,
+      },
     });
   }
 
@@ -31,7 +75,7 @@ export class DaysService {
     return this.prisma.days.findMany();
   }
 
-  async findOne(id: number) {
+  async findOne(id: number): Promise<Days> {
     const day = await this.prisma.days.findUnique({
       where: { id },
     });
@@ -55,11 +99,16 @@ export class DaysService {
   }
 
   async update(id: number, data: UpdateDayDto) {
-    await this.findOne(id);
+    const existingDay = await this.findOne(id);
+    const completed_on_time = await this.handleCompletedOnTime(existingDay);
     const formattedData = this.formatScoreData(data);
+
     return this.prisma.days.update({
       where: { id },
-      data: formattedData,
+      data: {
+        ...formattedData,
+        completed_on_time,
+      },
     });
   }
 
@@ -97,6 +146,7 @@ export class DaysService {
         evening_score: null,
         extra_score: null,
         sport: false,
+        completed_on_time: false,
       },
     });
   }
