@@ -3,70 +3,75 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateDayDto } from './dto/create-day.dto';
 import { UpdateDayDto } from './dto/update-day.dto';
 import { Days } from '@prisma/client';
+import { DayWire, toPrismaScore, toWire } from './score-mapper';
 
 @Injectable()
 export class DaysService {
   constructor(private prisma: PrismaService) {}
 
-  async createDay(data: CreateDayDto): Promise<Days> {
-    return this.prisma.days.create({
+  async createDay(data: CreateDayDto): Promise<DayWire> {
+    const created = await this.prisma.days.create({
       data: {
         user_id: data.user_id,
-        morning_score: data.morning_score ?? null,
-        afternoon_score: data.afternoon_score ?? null,
-        evening_score: data.evening_score ?? null,
+        morning_score: toPrismaScore(data.morning_score ?? null),
+        afternoon_score: toPrismaScore(data.afternoon_score ?? null),
+        evening_score: toPrismaScore(data.evening_score ?? null),
         snack: data.snack ?? null,
         sport: data.sport ?? false,
         sport_type: data.sport_type ?? null,
         date: data.date ?? new Date(),
       },
     });
+    return toWire(created);
   }
 
-  async findAll(): Promise<Days[]> {
-    return this.prisma.days.findMany();
+  async findAll(): Promise<DayWire[]> {
+    const rows = await this.prisma.days.findMany();
+    return rows.map(toWire);
   }
 
-  async findOne(id: number): Promise<Days> {
-    const day = await this.prisma.days.findUnique({ where: { id } });
-    if (!day) throw new NotFoundException(`Day with ID ${id} not found`);
-    return day;
+  async findOne(id: number): Promise<DayWire> {
+    const day = await this.loadOne(id);
+    return toWire(day);
   }
 
-  async getDaysByUserId(userId: number): Promise<Days[]> {
-    return this.prisma.days.findMany({
+  async getDaysByUserId(userId: number): Promise<DayWire[]> {
+    const rows = await this.prisma.days.findMany({
       where: { user_id: userId },
       orderBy: { date: 'desc' },
     });
+    return rows.map(toWire);
   }
 
-  async update(id: number, data: UpdateDayDto): Promise<Days> {
-    await this.findOne(id);
-    return this.prisma.days.update({
+  async update(id: number, data: UpdateDayDto): Promise<DayWire> {
+    await this.loadOne(id);
+    const updated = await this.prisma.days.update({
       where: { id },
       data: {
         ...(data.morning_score !== undefined && {
-          morning_score: data.morning_score,
+          morning_score: toPrismaScore(data.morning_score),
         }),
         ...(data.afternoon_score !== undefined && {
-          afternoon_score: data.afternoon_score,
+          afternoon_score: toPrismaScore(data.afternoon_score),
         }),
         ...(data.evening_score !== undefined && {
-          evening_score: data.evening_score,
+          evening_score: toPrismaScore(data.evening_score),
         }),
         ...(data.snack !== undefined && { snack: data.snack }),
         ...(data.sport !== undefined && { sport: data.sport }),
         ...(data.sport_type !== undefined && { sport_type: data.sport_type }),
       },
     });
+    return toWire(updated);
   }
 
-  async remove(id: number): Promise<Days> {
-    await this.findOne(id);
-    return this.prisma.days.delete({ where: { id } });
+  async remove(id: number): Promise<DayWire> {
+    await this.loadOne(id);
+    const deleted = await this.prisma.days.delete({ where: { id } });
+    return toWire(deleted);
   }
 
-  async getOrCreateTodayForUser(userId: number): Promise<Days> {
+  async getOrCreateTodayForUser(userId: number): Promise<DayWire> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today.getTime() + 86_400_000);
@@ -78,13 +83,20 @@ export class DaysService {
       },
     });
 
-    if (existingDay) return existingDay;
+    if (existingDay) return toWire(existingDay);
 
-    return this.prisma.days.create({
+    const created = await this.prisma.days.create({
       data: {
         user_id: userId,
         date: today,
       },
     });
+    return toWire(created);
+  }
+
+  private async loadOne(id: number): Promise<Days> {
+    const day = await this.prisma.days.findUnique({ where: { id } });
+    if (!day) throw new NotFoundException(`Day with ID ${id} not found`);
+    return day;
   }
 }
