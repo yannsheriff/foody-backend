@@ -3,40 +3,41 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateDayDto {
   @ApiProperty({
-    description: 'Score du matin',
+    description: 'Score du repas du matin',
     enum: Score,
     required: false,
     nullable: true,
-    example: 'normal',
+    example: 'leger',
   })
   morning_score?: Score | null;
 
   @ApiProperty({
-    description: "Score de l'après-midi",
-    enum: Score,
-    required: false,
-    nullable: true,
-    example: 'light',
-  })
-  afternoon_score?: Score | null;
-
-  @ApiProperty({
-    description: 'Score du soir',
-    enum: Score,
-    required: false,
-    nullable: true,
-    example: 'heavy',
-  })
-  evening_score?: Score | null;
-
-  @ApiProperty({
-    description: 'Score supplémentaire',
+    description: 'Score du repas du midi',
     enum: Score,
     required: false,
     nullable: true,
     example: 'normal',
   })
-  extra_score?: Score | null;
+  afternoon_score?: Score | null;
+
+  @ApiProperty({
+    description: 'Score du repas du soir',
+    enum: Score,
+    required: false,
+    nullable: true,
+    example: 'copieux',
+  })
+  evening_score?: Score | null;
+
+  @ApiProperty({
+    description: 'Niveau de grignotage de la journée (0 = aucun, 1 = beaucoup)',
+    required: false,
+    nullable: true,
+    minimum: 0,
+    maximum: 1,
+    example: 0.2,
+  })
+  snack?: number | null;
 
   @ApiProperty({
     description: 'Activité sportive effectuée',
@@ -44,4 +45,12 @@ export class UpdateDayDto {
     example: true,
   })
   sport?: boolean;
+
+  @ApiProperty({
+    description: "Type d'activité sportive",
+    required: false,
+    nullable: true,
+    example: 'course',
+  })
+  sport_type?: string | null;
 }

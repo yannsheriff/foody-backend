@@ -8,34 +8,35 @@ datasource db {
 }
 
 enum Score {
-  empty   @map("0")
-  light   @map("1")
-  normal  @map("2")
-  heavy   @map("3")
+  tresLeger   @map("tres-leger")
+  leger       @map("leger")
+  normal      @map("normal")
+  copieux     @map("copieux")
+  tresCopieux @map("tres-copieux")
 }
 
 model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  name     String
   password String
-  days  Days[]  // Relation nécessaire pour Prisma, même si non utilisée
+  days     Days[]
 
   @@map("users")
 }
 
 model Days {
-  id               Int      @id @default(autoincrement())
-  user_id          Int
-  morning_score    Score?   @default(empty)
-  afternoon_score  Score?   @default(empty)
-  evening_score    Score?   @default(empty)
-  extra_score      Score?   @default(empty)
-  sport            Boolean  @default(false)
-  completed_on_time Boolean @default(false)
+  id              Int      @id @default(autoincrement())
+  user_id         Int
+  morning_score   Score?
+  afternoon_score Score?
+  evening_score   Score?
+  snack           Float?
+  sport           Boolean  @default(false)
+  sport_type      String?
   date            DateTime @default(now())
   user            User     @relation(fields: [user_id], references: [id])
 
   @@index([user_id])
   @@map("days")
-} 
+}
