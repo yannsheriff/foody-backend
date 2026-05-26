@@ -1,9 +1,9 @@
 import { Days, Score } from '@prisma/client';
 
 const MEAL_POINTS: Record<Score, number> = {
-  tresLeger: 2.0,
-  leger: 1.5,
-  normal: 1.0,
+  tresLeger: 2.5,
+  leger: 2.25,
+  normal: 1.5,
   copieux: 0.5,
   tresCopieux: 0.0,
 };
@@ -20,7 +20,8 @@ export function computeDayScore(day: Days): number {
     mealPoints(day.evening_score);
   const sport = day.sport ? 2 : 0;
   const snack = day.snack == null ? 0 : 2 * (1 - day.snack);
-  return Math.round((meals + sport + snack) * 10) / 10;
+  const capped = Math.min(10, meals + sport + snack);
+  return Math.round(capped * 10) / 10;
 }
 
 export function isDayComplete(day: Days): boolean {
