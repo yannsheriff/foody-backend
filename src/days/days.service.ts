@@ -10,16 +10,24 @@ export class DaysService {
   constructor(private prisma: PrismaService) {}
 
   async createDay(data: CreateDayDto): Promise<DayWire> {
+    const morning = toPrismaScore(data.morning_score ?? null);
+    const afternoon = toPrismaScore(data.afternoon_score ?? null);
+    const evening = toPrismaScore(data.evening_score ?? null);
     const created = await this.prisma.days.create({
       data: {
         user_id: data.user_id,
-        morning_score: toPrismaScore(data.morning_score ?? null),
-        afternoon_score: toPrismaScore(data.afternoon_score ?? null),
-        evening_score: toPrismaScore(data.evening_score ?? null),
+        morning_score: morning,
+        afternoon_score: afternoon,
+        evening_score: evening,
         snack: data.snack ?? null,
         sport: data.sport ?? false,
         sport_type: data.sport_type ?? null,
         date: data.date ?? new Date(),
+        // Stamped at write time; lateness vs the day's own date is judged at
+        // read time (countsForStreak), so a backfilled day is excluded there.
+        ...(morning != null &&
+          afternoon != null &&
+          evening != null && { meals_completed_at: new Date() }),
       },
     });
     return toWire(created);
@@ -44,22 +52,38 @@ export class DaysService {
   }
 
   async update(id: number, data: UpdateDayDto): Promise<DayWire> {
-    await this.loadOne(id);
+    const existing = await this.loadOne(id);
+    const morning =
+      data.morning_score !== undefined
+        ? toPrismaScore(data.morning_score)
+        : existing.morning_score;
+    const afternoon =
+      data.afternoon_score !== undefined
+        ? toPrismaScore(data.afternoon_score)
+        : existing.afternoon_score;
+    const evening =
+      data.evening_score !== undefined
+        ? toPrismaScore(data.evening_score)
+        : existing.evening_score;
+    // Sticky: stamped only the first time the 3 meals become filled, never
+    // overwritten nor cleared by later edits.
+    const becameComplete =
+      existing.meals_completed_at == null &&
+      morning != null &&
+      afternoon != null &&
+      evening != null;
     const updated = await this.prisma.days.update({
       where: { id },
       data: {
-        ...(data.morning_score !== undefined && {
-          morning_score: toPrismaScore(data.morning_score),
-        }),
+        ...(data.morning_score !== undefined && { morning_score: morning }),
         ...(data.afternoon_score !== undefined && {
-          afternoon_score: toPrismaScore(data.afternoon_score),
+          afternoon_score: afternoon,
         }),
-        ...(data.evening_score !== undefined && {
-          evening_score: toPrismaScore(data.evening_score),
-        }),
+        ...(data.evening_score !== undefined && { evening_score: evening }),
         ...(data.snack !== undefined && { snack: data.snack }),
         ...(data.sport !== undefined && { sport: data.sport }),
         ...(data.sport_type !== undefined && { sport_type: data.sport_type }),
+        ...(becameComplete && { meals_completed_at: new Date() }),
       },
     });
     return toWire(updated);

@@ -35,6 +35,9 @@ model Days {
   sport           Boolean  @default(false)
   sport_type      String?
   date            DateTime @default(now())
+  // Set server-side the first time all 3 meals are filled; never overwritten.
+  // NULL = pre-feature row, treated as on-time for the streak (grandfathered).
+  meals_completed_at DateTime?
   user            User     @relation(fields: [user_id], references: [id])
 
   @@index([user_id])

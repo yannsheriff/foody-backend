@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Days } from '@prisma/client';
 import {
   computeDayScore,
+  countsForStreak,
   diffDays,
   isDayFullyTracked,
   startOfDay,
@@ -30,8 +31,9 @@ export class InsightsService {
 
     let current = 0;
     let cursor: Date | null = null;
-    // Streak starts at most recent fully-tracked day that is today or yesterday
-    const head = sorted.find((d) => isDayFullyTracked(d));
+    // Streak starts at most recent on-time fully-tracked day that is today or
+    // yesterday. Late-backfilled days never revive a lost flame.
+    const head = sorted.find((d) => countsForStreak(d));
     if (head) {
       const headDate = startOfDay(new Date(head.date));
       if (
@@ -44,7 +46,7 @@ export class InsightsService {
           if (
             cursor &&
             date.getTime() === cursor.getTime() &&
-            isDayFullyTracked(d)
+            countsForStreak(d)
           ) {
             current++;
             cursor = new Date(cursor.getTime() - 86_400_000);
@@ -269,7 +271,7 @@ export class InsightsService {
     let prev: Date | null = null;
     for (const d of sortedDesc) {
       const date = startOfDay(new Date(d.date));
-      if (!isDayFullyTracked(d)) {
+      if (!countsForStreak(d)) {
         current = 0;
         prev = date;
         continue;

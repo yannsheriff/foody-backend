@@ -43,6 +43,27 @@ export function isDayFullyTracked(day: Days): boolean {
   );
 }
 
+// Mirrors CATCHUP_DEADLINE_MINUTES (23h30) in foody/src/hooks/useCatchupTarget.ts
+// — if the client catch-up window moves, move this with it.
+export const GRACE_CUTOFF_MINUTES = 23 * 60 + 30;
+
+// Day D counts for the streak only if its 3 meals were completed by D+1 23:30.
+// Server clock is UTC on Vercel while the client cutoff is local time, so the
+// server is ~1-2h more lenient for a Paris user — the safe direction (we never
+// strip a flame the client promised).
+export function graceDeadline(dayDate: Date): Date {
+  return new Date(
+    startOfDay(dayDate).getTime() + 86_400_000 + GRACE_CUTOFF_MINUTES * 60_000,
+  );
+}
+
+export function countsForStreak(day: Days): boolean {
+  if (!isDayFullyTracked(day)) return false;
+  // Rows written before meals_completed_at existed are grandfathered.
+  if (day.meals_completed_at == null) return true;
+  return day.meals_completed_at.getTime() <= graceDeadline(day.date).getTime();
+}
+
 export function ymd(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');

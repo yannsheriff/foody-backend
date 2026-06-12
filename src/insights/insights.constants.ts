@@ -1,5 +1,9 @@
 import { Days, Score } from '@prisma/client';
-import { computeDayScore, isDayFullyTracked } from './insights.scoring';
+import {
+  computeDayScore,
+  countsForStreak,
+  isDayFullyTracked,
+} from './insights.scoring';
 
 export interface ChallengeDefinition {
   id: string;
@@ -92,7 +96,7 @@ export const BADGES: BadgeDefinition[] = [
     unlock: (all) =>
       countConsecutiveStreak(
         all,
-        (d) => isDayFullyTracked(d) && computeDayScore(d) >= 7,
+        (d) => countsForStreak(d) && computeDayScore(d) >= 7,
       ) >= 7,
   },
   {
@@ -159,5 +163,6 @@ function countConsecutiveStreak(
 }
 
 function longestStreak(all: Days[]): number {
-  return countConsecutiveStreak(all, isDayFullyTracked);
+  // Streak badges follow the flame rule: late-backfilled days don't count.
+  return countConsecutiveStreak(all, countsForStreak);
 }
