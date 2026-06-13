@@ -16,13 +16,36 @@ enum Score {
 }
 
 model User {
-  id       Int    @id @default(autoincrement())
-  email    String @unique
-  name     String
-  password String
-  days     Days[]
+  id         Int             @id @default(autoincrement())
+  email      String          @unique
+  name       String
+  password   String
+  days       Days[]
+  challenges UserChallenge[]
 
   @@map("users")
+}
+
+// Single-word lowercase values on purpose: Prisma identifier, DB string and
+// wire string are identical, so no mapper is needed (unlike Score).
+enum ChallengeStatus {
+  active
+  completed
+  abandoned
+}
+
+model UserChallenge {
+  id           Int             @id @default(autoincrement())
+  user_id      Int
+  // Catalog id from challenges.constants.ts — ids are persisted, never rename.
+  challenge_id String
+  status       ChallengeStatus @default(active)
+  started_at   DateTime        @default(now())
+  completed_at DateTime?
+  user         User            @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@map("user_challenges")
 }
 
 model Days {

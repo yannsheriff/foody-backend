@@ -9,10 +9,9 @@ import {
   startOfDay,
   ymd,
 } from './insights.scoring';
-import { BADGES, CHALLENGES } from './insights.constants';
+import { BADGES } from './insights.constants';
 import { StreakDto } from './dto/streak.dto';
 import { RecordsDto } from './dto/records.dto';
-import { ChallengeDto, ChallengesResponseDto } from './dto/challenge.dto';
 import { BadgeDto } from './dto/badge.dto';
 import { StatsDto } from './dto/stats.dto';
 
@@ -99,52 +98,6 @@ export class InsightsService {
       ),
       monthAverage,
     };
-  }
-
-  async getChallenges(userId: number): Promise<ChallengesResponseDto> {
-    const days = await this.loadDays(userId);
-    const now = new Date();
-    const monthStart = startOfDay(
-      new Date(now.getFullYear(), now.getMonth(), 1),
-    );
-    const weekStart = this.startOfWeek(now);
-
-    const active: ChallengeDto[] = [];
-    const upcoming: ChallengeDto[] = [];
-    const completed: ChallengeDto[] = [];
-
-    for (const def of CHALLENGES) {
-      const window = days.filter((d) => {
-        const date = new Date(d.date);
-        return date >= (def.type === 'weekly' ? weekStart : monthStart);
-      });
-      const progress = def.progress(window);
-      const card: ChallengeDto = {
-        id: def.id,
-        title: def.title,
-        type: def.type,
-        typeLabel:
-          def.type === 'monthly'
-            ? `${def.typeLabel} · ${this.monthLabel(now)}`
-            : `${def.typeLabel} · S${this.weekNumber(now)}`,
-        icon: def.icon,
-        progress,
-        total: def.total,
-        leftLabel: def.leftLabel(progress, def.total),
-        status:
-          progress >= def.total
-            ? 'completed'
-            : progress > 0
-              ? 'active'
-              : 'upcoming',
-        subtitle: def.subtitle,
-      };
-      if (card.status === 'completed') completed.push(card);
-      else if (card.status === 'active') active.push(card);
-      else upcoming.push(card);
-    }
-
-    return { active, upcoming, completed };
   }
 
   async getBadges(userId: number): Promise<BadgeDto[]> {
@@ -286,14 +239,6 @@ export class InsightsService {
     return max;
   }
 
-  private startOfWeek(date: Date): Date {
-    const d = startOfDay(date);
-    const day = d.getDay();
-    const offset = day === 0 ? 6 : day - 1; // Monday-first
-    d.setDate(d.getDate() - offset);
-    return d;
-  }
-
   private weekNumber(date: Date): number {
     const d = new Date(
       Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
@@ -313,23 +258,6 @@ export class InsightsService {
     }
     const n = new Date();
     return new Date(n.getFullYear(), n.getMonth(), 1);
-  }
-
-  private monthLabel(date: Date): string {
-    return [
-      'janvier',
-      'février',
-      'mars',
-      'avril',
-      'mai',
-      'juin',
-      'juillet',
-      'août',
-      'septembre',
-      'octobre',
-      'novembre',
-      'décembre',
-    ][date.getMonth()];
   }
 
   private fmt(n: number): string {

@@ -43,6 +43,14 @@ export function isDayFullyTracked(day: Days): boolean {
   );
 }
 
+const HEAVY_LEVELS: Score[] = ['copieux', 'tresCopieux'];
+
+export function hasHeavyMeal(day: Days): boolean {
+  return [day.morning_score, day.afternoon_score, day.evening_score].some(
+    (s) => s != null && HEAVY_LEVELS.includes(s),
+  );
+}
+
 // Mirrors CATCHUP_DEADLINE_MINUTES (23h30) in foody/src/hooks/useCatchupTarget.ts
 // — if the client catch-up window moves, move this with it.
 export const GRACE_CUTOFF_MINUTES = 23 * 60 + 30;

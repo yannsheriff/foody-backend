@@ -1,67 +1,10 @@
-import { Days, Score } from '@prisma/client';
+import { Days } from '@prisma/client';
 import {
   computeDayScore,
   countsForStreak,
+  hasHeavyMeal,
   isDayFullyTracked,
 } from './insights.scoring';
-
-export interface ChallengeDefinition {
-  id: string;
-  title: string;
-  type: 'weekly' | 'monthly';
-  typeLabel: string;
-  icon: string;
-  total: number;
-  subtitle?: string;
-  // Returns progress count for the day window (week=Mon→Sun, month=current month)
-  progress: (days: Days[]) => number;
-  // Free-form "X jours / séances restantes"
-  leftLabel: (progress: number, total: number) => string;
-}
-
-const HEAVY: Score[] = ['copieux', 'tresCopieux'];
-
-export const CHALLENGES: ChallengeDefinition[] = [
-  {
-    id: 'no-heavy-5',
-    title: '5 jours sans repas copieux',
-    type: 'weekly',
-    typeLabel: 'Hebdomadaire',
-    icon: '🥗',
-    total: 5,
-    progress: (days) =>
-      days.filter((d) => {
-        if (!isDayFullyTracked(d)) return false;
-        return ![d.morning_score, d.afternoon_score, d.evening_score].some(
-          (s) => s && HEAVY.includes(s),
-        );
-      }).length,
-    leftLabel: (p, t) => (p >= t ? 'Défi terminé' : `Encore ${t - p} jours`),
-  },
-  {
-    id: 'sport-15',
-    title: '15 séances de sport',
-    type: 'monthly',
-    typeLabel: 'Mensuel',
-    icon: '🏃',
-    total: 15,
-    progress: (days) => days.filter((d) => d.sport).length,
-    leftLabel: (p, t) => (p >= t ? 'Défi terminé' : `Encore ${t - p} séances`),
-  },
-  {
-    id: 'light-7',
-    title: '7 jours sous 6/10 max',
-    type: 'weekly',
-    typeLabel: 'Hebdomadaire',
-    icon: '🌱',
-    total: 7,
-    subtitle: 'Score moyen 6+ pendant 7 jours',
-    progress: (days) =>
-      days.filter((d) => isDayFullyTracked(d) && computeDayScore(d) >= 6)
-        .length,
-    leftLabel: (p, t) => (p >= t ? 'Défi terminé' : `Encore ${t - p} jours`),
-  },
-];
 
 export interface BadgeDefinition {
   id: string;
@@ -75,7 +18,7 @@ export const BADGES: BadgeDefinition[] = [
     id: 'sobriete',
     title: 'Sobriété',
     emoji: '🌿',
-    unlock: (all) => countConsecutiveStreak(all, (d) => !hasHeavy(d)) >= 7,
+    unlock: (all) => countConsecutiveStreak(all, (d) => !hasHeavyMeal(d)) >= 7,
   },
   {
     id: 'constance',
@@ -118,6 +61,8 @@ export const BADGES: BadgeDefinition[] = [
     id: 'no-snack',
     title: 'Sans grignoter',
     emoji: '🍪',
+    // 0.15 mirrors SNACK_THRESHOLD in challenges/challenges.progress.ts —
+    // if one moves, move the other.
     unlock: (all) =>
       all.filter((d) => d.snack != null && d.snack < 0.15).length >= 10,
   },
@@ -128,12 +73,6 @@ export const BADGES: BadgeDefinition[] = [
     unlock: (all) => all.filter(isDayFullyTracked).length >= 50,
   },
 ];
-
-function hasHeavy(d: Days): boolean {
-  return [d.morning_score, d.afternoon_score, d.evening_score].some(
-    (s) => s && HEAVY.includes(s),
-  );
-}
 
 function countConsecutiveStreak(
   all: Days[],

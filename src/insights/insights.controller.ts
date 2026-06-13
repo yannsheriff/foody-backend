@@ -11,7 +11,6 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { InsightsService } from './insights.service';
 import { StreakDto } from './dto/streak.dto';
 import { RecordsDto } from './dto/records.dto';
-import { ChallengesResponseDto } from './dto/challenge.dto';
 import { BadgeDto } from './dto/badge.dto';
 import { StatsDto } from './dto/stats.dto';
 
@@ -40,13 +39,6 @@ export class InsightsController {
   @ApiResponse({ status: 200, type: RecordsDto })
   getRecords(@Req() req: AuthedRequest): Promise<RecordsDto> {
     return this.insights.getRecords(req.user.id);
-  }
-
-  @Get('challenges')
-  @ApiOperation({ summary: 'Défis hebdomadaires et mensuels avec progression' })
-  @ApiResponse({ status: 200, type: ChallengesResponseDto })
-  getChallenges(@Req() req: AuthedRequest): Promise<ChallengesResponseDto> {
-    return this.insights.getChallenges(req.user.id);
   }
 
   @Get('badges')

@@ -6,9 +6,17 @@ import { DaysModule } from './days/days.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { InsightsModule } from './insights/insights.module';
+import { ChallengesModule } from './challenges/challenges.module';
 
 @Module({
-  imports: [PrismaModule, DaysModule, UsersModule, AuthModule, InsightsModule],
+  imports: [
+    PrismaModule,
+    DaysModule,
+    UsersModule,
+    AuthModule,
+    InsightsModule,
+    ChallengesModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
