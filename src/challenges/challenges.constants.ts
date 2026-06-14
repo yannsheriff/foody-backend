@@ -40,14 +40,14 @@ export const LEVELS: LevelDef[] = [
   {
     n: 2,
     emoji: '🌿',
-    short: 'Confirmé',
+    short: 'Régulier',
     title: 'On passe à la vitesse supérieure',
     tagline: 'Les bonnes habitudes commencent à rentrer',
   },
   {
     n: 3,
     emoji: '🌳',
-    short: 'Régulier',
+    short: 'Confirmé',
     title: 'J’ai de la bouteille',
     tagline: 'On vise la régularité sur la durée',
   },
