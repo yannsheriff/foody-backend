@@ -2,8 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDayDto } from './dto/create-day.dto';
 import { UpdateDayDto } from './dto/update-day.dto';
-import { Days } from '@prisma/client';
+import { Days, SportLevel } from '@prisma/client';
 import { DayWire, toPrismaScore, toWire } from './score-mapper';
+
+// Legacy `sport` boolean is a derived mirror of sport_level: a real session
+// (normal/intense) is "sport done", repos/null is not.
+function sportBool(level: SportLevel | null | undefined): boolean {
+  return level === 'normal' || level === 'intense';
+}
 
 @Injectable()
 export class DaysService {
@@ -13,6 +19,8 @@ export class DaysService {
     const morning = toPrismaScore(data.morning_score ?? null);
     const afternoon = toPrismaScore(data.afternoon_score ?? null);
     const evening = toPrismaScore(data.evening_score ?? null);
+    // sport_level is the source of truth; fall back to the legacy boolean.
+    const sportLevel = data.sport_level ?? (data.sport ? 'normal' : null);
     const created = await this.prisma.days.create({
       data: {
         user_id: data.user_id,
@@ -20,7 +28,8 @@ export class DaysService {
         afternoon_score: afternoon,
         evening_score: evening,
         snack: data.snack ?? null,
-        sport: data.sport ?? false,
+        sport_level: sportLevel,
+        sport: sportBool(sportLevel),
         sport_type: data.sport_type ?? null,
         date: data.date ?? new Date(),
         // Stamped at write time; lateness vs the day's own date is judged at
@@ -72,6 +81,17 @@ export class DaysService {
       morning != null &&
       afternoon != null &&
       evening != null;
+    // Resolve the new sport level: explicit sport_level wins, else derive from
+    // the legacy boolean if it was the only sport field sent. Writing sport_level
+    // always mirrors the derived `sport` boolean to keep the legacy column valid.
+    const sportLevel =
+      data.sport_level !== undefined
+        ? data.sport_level
+        : data.sport !== undefined
+          ? data.sport
+            ? 'normal'
+            : 'none'
+          : undefined;
     const updated = await this.prisma.days.update({
       where: { id },
       data: {
@@ -81,7 +101,10 @@ export class DaysService {
         }),
         ...(data.evening_score !== undefined && { evening_score: evening }),
         ...(data.snack !== undefined && { snack: data.snack }),
-        ...(data.sport !== undefined && { sport: data.sport }),
+        ...(sportLevel !== undefined && {
+          sport_level: sportLevel,
+          sport: sportBool(sportLevel),
+        }),
         ...(data.sport_type !== undefined && { sport_type: data.sport_type }),
         ...(becameComplete && { meals_completed_at: new Date() }),
       },

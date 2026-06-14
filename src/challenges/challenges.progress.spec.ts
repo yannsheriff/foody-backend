@@ -28,6 +28,7 @@ function mkDay(over: Partial<Days> & { date: Date }): Days {
     evening_score: 'leger',
     snack: 0,
     sport: false,
+    sport_level: null,
     sport_type: null,
     meals_completed_at: null,
     ...over,
@@ -171,13 +172,17 @@ describe('sport (sessions within a rolling window)', () => {
   const sport3 = def('sport-3-semaine'); // 3 séances / 7 jours
 
   it('3 sessions within 7 days completes', () => {
-    const days = [0, 3, 6].map((o) => mkDay({ date: dayAt(o), sport: true }));
+    const days = [0, 3, 6].map((o) =>
+      mkDay({ date: dayAt(o), sport_level: 'normal' }),
+    );
     const { done } = computeChallengeProgress(sport3, days, dayAt(6));
     expect(done).toBe(true);
   });
 
   it('3 sessions spread over 8 days does not complete', () => {
-    const days = [0, 4, 7].map((o) => mkDay({ date: dayAt(o), sport: true }));
+    const days = [0, 4, 7].map((o) =>
+      mkDay({ date: dayAt(o), sport_level: 'normal' }),
+    );
     const { prog, done } = computeChallengeProgress(sport3, days, dayAt(7));
     expect(done).toBe(false);
     // trailing 7-day window only holds the J-0 and J-4 sessions
@@ -187,7 +192,7 @@ describe('sport (sessions within a rolling window)', () => {
   it('a past in-window success stays done even after the window slides', () => {
     // sessions J-20/J-18/J-16 (within 7 days), nothing since
     const days = [16, 18, 20].map((o) =>
-      mkDay({ date: dayAt(o), sport: true }),
+      mkDay({ date: dayAt(o), sport_level: 'normal' }),
     );
     const { prog, done } = computeChallengeProgress(sport3, days, dayAt(20));
     expect(done).toBe(true);
@@ -195,7 +200,9 @@ describe('sport (sessions within a rolling window)', () => {
   });
 
   it('sessions before started_at are ignored', () => {
-    const days = [0, 1, 2].map((o) => mkDay({ date: dayAt(o), sport: true }));
+    const days = [0, 1, 2].map((o) =>
+      mkDay({ date: dayAt(o), sport_level: 'normal' }),
+    );
     const { prog } = computeChallengeProgress(sport3, days, dayAt(1));
     expect(prog).toBe(2);
   });

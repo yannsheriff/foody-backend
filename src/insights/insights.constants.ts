@@ -55,7 +55,10 @@ export const BADGES: BadgeDefinition[] = [
     id: 'sport-20',
     title: '20 sport',
     emoji: '🏃',
-    unlock: (all) => all.filter((d) => d.sport).length >= 20,
+    unlock: (all) =>
+      all.filter(
+        (d) => d.sport_level === 'normal' || d.sport_level === 'intense',
+      ).length >= 20,
   },
   {
     id: 'no-snack',

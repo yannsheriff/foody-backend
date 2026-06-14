@@ -34,6 +34,16 @@ enum ChallengeStatus {
   abandoned
 }
 
+// Effort level for the daily sport entry (replaces the old `sport` boolean).
+// Single-word lowercase values: Prisma identifier = DB string = wire string,
+// no mapper needed (like ChallengeStatus, unlike Score). NULL = not answered
+// yet; `none` (repos) is a valid, deliberate answer worth 0 pt.
+enum SportLevel {
+  none
+  normal
+  intense
+}
+
 model UserChallenge {
   id           Int             @id @default(autoincrement())
   user_id      Int
@@ -55,7 +65,10 @@ model Days {
   afternoon_score Score?
   evening_score   Score?
   snack           Float?
-  sport           Boolean  @default(false)
+  // Legacy mirror kept in sync on write (true when sport_level is normal/intense)
+  // for backward compatibility; sport_level is the source of truth for reads.
+  sport           Boolean     @default(false)
+  sport_level     SportLevel?
   sport_type      String?
   date            DateTime @default(now())
   // Set server-side the first time all 3 meals are filled; never overwritten.

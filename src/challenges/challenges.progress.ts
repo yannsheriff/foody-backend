@@ -30,7 +30,8 @@ function qualifies(def: ChallengeDef, d: Days): boolean {
     case 'note':
       return isDayFullyTracked(d) && computeDayScore(d) >= (def.minScore ?? 0);
     case 'sport':
-      return d.sport === true;
+      // A real session counts as a sport day; repos (none) / unanswered doesn't.
+      return d.sport_level === 'normal' || d.sport_level === 'intense';
   }
 }
 

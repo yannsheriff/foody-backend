@@ -1,4 +1,4 @@
-import { Score } from '@prisma/client';
+import { Score, SportLevel } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateDayDto {
@@ -53,7 +53,18 @@ export class CreateDayDto {
   date?: Date;
 
   @ApiProperty({
-    description: 'Activité sportive effectuée',
+    description:
+      "Niveau d'effort sportif : none (repos) · normal · intense. Source de vérité du sport.",
+    enum: SportLevel,
+    required: false,
+    nullable: true,
+    example: 'normal',
+  })
+  sport_level?: SportLevel | null;
+
+  @ApiProperty({
+    description:
+      'Legacy : activité sportive effectuée (dérivé de sport_level, conservé pour compat).',
     required: false,
     default: false,
     example: true,
@@ -61,7 +72,7 @@ export class CreateDayDto {
   sport?: boolean;
 
   @ApiProperty({
-    description: "Type d'activité sportive",
+    description: "Type d'activité sportive (legacy, non utilisé par la saisie)",
     required: false,
     nullable: true,
     example: 'course',

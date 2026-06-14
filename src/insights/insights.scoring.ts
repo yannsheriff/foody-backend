@@ -1,4 +1,4 @@
-import { Days, Score } from '@prisma/client';
+import { Days, Score, SportLevel } from '@prisma/client';
 
 const MEAL_POINTS: Record<Score, number> = {
   tresLeger: 2.5,
@@ -8,9 +8,23 @@ const MEAL_POINTS: Record<Score, number> = {
   tresCopieux: 0.0,
 };
 
+// Mirrors SPORT_LEVELS in foody/src/lib/meal-levels.ts — keep the point values
+// in sync across the two scoring implementations. The total score is still
+// capped at 10, so intense (+3) just gives more headroom to reach a perfect day.
+const SPORT_POINTS: Record<SportLevel, number> = {
+  none: 0,
+  normal: 2,
+  intense: 3,
+};
+
 function mealPoints(level: Score | null): number {
   if (level == null) return 0;
   return MEAL_POINTS[level] ?? 0;
+}
+
+export function sportPoints(day: Days): number {
+  if (day.sport_level == null) return 0;
+  return SPORT_POINTS[day.sport_level] ?? 0;
 }
 
 export function computeDayScore(day: Days): number {
@@ -18,7 +32,7 @@ export function computeDayScore(day: Days): number {
     mealPoints(day.morning_score) +
     mealPoints(day.afternoon_score) +
     mealPoints(day.evening_score);
-  const sport = day.sport ? 2 : 0;
+  const sport = sportPoints(day);
   const snack = day.snack == null ? 0 : 2 * (1 - day.snack);
   const capped = Math.min(10, meals + sport + snack);
   return Math.round(capped * 10) / 10;
@@ -30,7 +44,7 @@ export function isDayComplete(day: Days): boolean {
     day.afternoon_score != null &&
     day.evening_score != null &&
     day.snack != null &&
-    day.sport != null
+    day.sport_level != null
   );
 }
 

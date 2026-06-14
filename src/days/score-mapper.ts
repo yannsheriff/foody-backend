@@ -45,6 +45,9 @@ export interface DayWire {
   evening_score: string | null;
   snack: number | null;
   sport: boolean;
+  // Single-word lowercase enum (none/normal/intense) — identical Prisma/DB/wire
+  // representation, so no mapping needed (unlike Score).
+  sport_level: string | null;
   sport_type: string | null;
   date: Date;
 }
@@ -58,6 +61,7 @@ export function toWire(day: Days): DayWire {
     evening_score: fromPrismaScore(day.evening_score),
     snack: day.snack,
     sport: day.sport,
+    sport_level: day.sport_level,
     sport_type: day.sport_type,
     date: day.date,
   };
