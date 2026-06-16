@@ -59,6 +59,8 @@ function qualifyingDayIndex(
 // an in-progress day isn't a failure until it's over (mirrors getStreak's
 // today/yesterday head rule) — it can only add. From yesterday backwards,
 // every day must exist and qualify; the first miss stops the count.
+// This drives the *displayed* progress: it counts today, so the card reads
+// full (e.g. 5/5) on the evening of the final day.
 export function computeConsecutiveProgress(
   days: Days[],
   def: ChallengeDef,
@@ -81,10 +83,48 @@ export function computeConsecutiveProgress(
   return count;
 }
 
+// Completion is only granted once the final qualifying day is fully elapsed
+// ("le défi est validé à minuit le dernier jour"): we look for any run of
+// `def.total` consecutive qualifying days ending on or before *yesterday*.
+// Scanning the whole [start, yesterday] span (not just the trailing run) means
+// a run that completed days ago still counts even if the user skipped the days
+// since — it can't be un-done by a later gap. Today is deliberately excluded,
+// so a finished-but-not-yet-midnight day stays `done: false` until tomorrow.
+function hasCompletedConsecutiveRun(
+  days: Days[],
+  def: ChallengeDef,
+  start: Date,
+  today: Date,
+): boolean {
+  const index = qualifyingDayIndex(days, def, start, today);
+  const yesterday = new Date(today.getTime() - 86_400_000);
+
+  let streak = 0;
+  let cursor = new Date(start.getTime());
+  while (cursor.getTime() <= yesterday.getTime()) {
+    streak = index.get(ymd(cursor)) === true ? streak + 1 : 0;
+    if (streak >= def.total) return true;
+    cursor = new Date(cursor.getTime() + 86_400_000);
+  }
+  return false;
+}
+
+// True if `total` qualifying dates fit within any `windowDays`-day span.
+function hasSportWindow(
+  dates: Date[],
+  total: number,
+  windowDays: number,
+): boolean {
+  for (let i = 0; i + total - 1 < dates.length; i++) {
+    if (diffDays(dates[i + total - 1], dates[i]) < windowDays) return true;
+  }
+  return false;
+}
+
 // Sport: `total` sessions within any `windowDays`-day span since the start.
-// A past success can never be lost by reading later; while not done, the
-// displayed progress is the count in the trailing window (it can honestly
-// drop as old sessions slide out).
+// Displayed progress counts today (and shows `total` as soon as a window is
+// full, including a session logged today); completion, however, only fires
+// once the completing window sits entirely on elapsed days (≤ yesterday).
 export function computeSportProgress(
   days: Days[],
   def: ChallengeDef,
@@ -93,6 +133,7 @@ export function computeSportProgress(
 ): ChallengeProgress {
   const start = startOfDay(startedAt);
   const today = startOfDay(now);
+  const yesterday = new Date(today.getTime() - 86_400_000);
   const windowDays = def.windowDays ?? 7;
   const index = qualifyingDayIndex(days, def, start, today);
   const dates = [...index.entries()]
@@ -100,11 +141,14 @@ export function computeSportProgress(
     .map(([key]) => startOfDay(new Date(key)))
     .sort((a, b) => a.getTime() - b.getTime());
 
-  for (let i = 0; i + def.total - 1 < dates.length; i++) {
-    if (diffDays(dates[i + def.total - 1], dates[i]) < windowDays) {
-      return { prog: def.total, done: true };
-    }
-  }
+  const done = hasSportWindow(
+    dates.filter((d) => d.getTime() <= yesterday.getTime()),
+    def.total,
+    windowDays,
+  );
+  // A full window (counting today) shows `total` even before it's validated.
+  const full = done || hasSportWindow(dates, def.total, windowDays);
+  if (full) return { prog: def.total, done };
 
   const trailing = dates.filter((d) => diffDays(today, d) < windowDays).length;
   return { prog: Math.min(trailing, def.total), done: false };
@@ -120,7 +164,13 @@ export function computeChallengeProgress(
     return computeSportProgress(days, def, startedAt, now);
   }
   const run = computeConsecutiveProgress(days, def, startedAt, now);
-  return { prog: Math.min(run, def.total), done: run >= def.total };
+  const done = hasCompletedConsecutiveRun(
+    days,
+    def,
+    startOfDay(startedAt),
+    startOfDay(now),
+  );
+  return { prog: Math.min(run, def.total), done };
 }
 
 export function leftLabel(def: ChallengeDef, prog: number): string {

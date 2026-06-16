@@ -54,11 +54,20 @@ describe('catalog', () => {
 describe('saisie (consecutive fully-tracked days)', () => {
   const saisie3 = def('saisie-3');
 
-  it('completes after N consecutive tracked days', () => {
+  it('completes once N consecutive tracked days are fully elapsed (≤ yesterday)', () => {
+    const days = [1, 2, 3].map((o) => mkDay({ date: dayAt(o) }));
+    const { prog, done } = computeChallengeProgress(saisie3, days, dayAt(3));
+    expect(prog).toBe(3);
+    expect(done).toBe(true);
+  });
+
+  it('a run reaching the target only by counting today is not done yet', () => {
+    // J-0/J-1/J-2 tracked: full progress, but the final day (today) is not
+    // over → validated at midnight, so done stays false until tomorrow.
     const days = [0, 1, 2].map((o) => mkDay({ date: dayAt(o) }));
     const { prog, done } = computeChallengeProgress(saisie3, days, dayAt(2));
     expect(prog).toBe(3);
-    expect(done).toBe(true);
+    expect(done).toBe(false);
   });
 
   it('resets on a missed day before today', () => {
@@ -93,12 +102,12 @@ describe('saisie (consecutive fully-tracked days)', () => {
 
   it('duplicate rows for the same date do not break a run', () => {
     const days = [
-      mkDay({ date: dayAt(0) }),
-      mkDay({ date: dayAt(1), morning_score: null }), // empty duplicate
       mkDay({ date: dayAt(1) }),
+      mkDay({ date: dayAt(2), morning_score: null }), // empty duplicate
       mkDay({ date: dayAt(2) }),
+      mkDay({ date: dayAt(3) }),
     ];
-    const { done } = computeChallengeProgress(saisie3, days, dayAt(2));
+    const { done } = computeChallengeProgress(saisie3, days, dayAt(3));
     expect(done).toBe(true);
   });
 });
@@ -120,10 +129,10 @@ describe('grignotage (snack below threshold)', () => {
   const grignotage3 = def('grignotage-3');
 
   it('snack just under the threshold qualifies, at it fails', () => {
-    const under = [0, 1, 2].map((o) =>
+    const under = [1, 2, 3].map((o) =>
       mkDay({ date: dayAt(o), snack: SNACK_THRESHOLD - 0.01 }),
     );
-    expect(computeChallengeProgress(grignotage3, under, dayAt(2)).done).toBe(
+    expect(computeChallengeProgress(grignotage3, under, dayAt(3)).done).toBe(
       true,
     );
 
@@ -146,8 +155,8 @@ describe('note (consecutive days at/above minScore)', () => {
 
   it('a day scoring exactly the minimum qualifies', () => {
     // leger+normal+leger = 6.0, no sport, snack=1 → exactly 6
-    const days = [0, 1, 2].map((o) => mkDay({ date: dayAt(o), snack: 1 }));
-    const { done } = computeChallengeProgress(note63, days, dayAt(2));
+    const days = [1, 2, 3].map((o) => mkDay({ date: dayAt(o), snack: 1 }));
+    const { done } = computeChallengeProgress(note63, days, dayAt(3));
     expect(done).toBe(true);
   });
 
@@ -171,12 +180,24 @@ describe('note (consecutive days at/above minScore)', () => {
 describe('sport (sessions within a rolling window)', () => {
   const sport3 = def('sport-3-semaine'); // 3 séances / 7 jours
 
-  it('3 sessions within 7 days completes', () => {
-    const days = [0, 3, 6].map((o) =>
+  it('3 sessions within 7 days completes once the window is elapsed', () => {
+    const days = [1, 3, 6].map((o) =>
       mkDay({ date: dayAt(o), sport_level: 'normal' }),
     );
-    const { done } = computeChallengeProgress(sport3, days, dayAt(6));
+    const { prog, done } = computeChallengeProgress(sport3, days, dayAt(6));
+    expect(prog).toBe(3);
     expect(done).toBe(true);
+  });
+
+  it('a window completed only by counting today is full but not done yet', () => {
+    // sessions J-0/J-1/J-2: window full, but the last session lands today →
+    // validated at midnight, so done stays false until tomorrow.
+    const days = [0, 1, 2].map((o) =>
+      mkDay({ date: dayAt(o), sport_level: 'normal' }),
+    );
+    const { prog, done } = computeChallengeProgress(sport3, days, dayAt(2));
+    expect(prog).toBe(3);
+    expect(done).toBe(false);
   });
 
   it('3 sessions spread over 8 days does not complete', () => {

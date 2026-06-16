@@ -122,9 +122,9 @@ describe('ChallengesService.getHub', () => {
     expect(item?.prog).toBe(2);
   });
 
-  it('lazily persists completion when the target is reached', async () => {
-    const days = [0, 1, 2].map((o) => mkDay({ date: dayAt(o) }));
-    const rows = [mkRow({ challenge_id: 'saisie-3', started_at: dayAt(2) })];
+  it('lazily persists completion once the final day is elapsed', async () => {
+    const days = [1, 2, 3].map((o) => mkDay({ date: dayAt(o) }));
+    const rows = [mkRow({ challenge_id: 'saisie-3', started_at: dayAt(3) })];
     const { service, prisma } = mkService(days, rows);
     const hub = await service.getHub(1);
     expect(prisma.userChallenge.update).toHaveBeenCalledWith(
@@ -135,6 +135,17 @@ describe('ChallengesService.getHub', () => {
     expect(hub.active).toBeNull();
     const item = hub.levels[0].items.find((i) => i.id === 'saisie-3');
     expect(item?.state).toBe('done');
+  });
+
+  it('does not persist completion while the final day is still today', async () => {
+    // Target reached only by counting today → "validé à minuit": the défi stays
+    // active and full until tomorrow's first read flips it.
+    const days = [0, 1, 2].map((o) => mkDay({ date: dayAt(o) }));
+    const rows = [mkRow({ challenge_id: 'saisie-3', started_at: dayAt(2) })];
+    const { service, prisma } = mkService(days, rows);
+    const hub = await service.getHub(1);
+    expect(prisma.userChallenge.update).not.toHaveBeenCalled();
+    expect(hub.active).toMatchObject({ id: 'saisie-3', prog: 3, total: 3 });
   });
 
   it('all 16 done: every level done, no current', async () => {
