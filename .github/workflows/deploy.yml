@@ -1,9 +1,14 @@
 name: Deploy to Vercel (production)
 
-# Real auto-deploy: every push to main builds and ships to production via the
-# Vercel CLI. Requires three repo secrets — VERCEL_ORG_ID and VERCEL_PROJECT_ID
-# (already set), and VERCEL_TOKEN (create at vercel.com/account/tokens, then:
-#   gh secret set VERCEL_TOKEN --repo yannsheriff/foody-backend --body <token>)
+# Real auto-deploy: every push to main ships to production via the Vercel CLI.
+# IMPORTANT: this backend deploys with Vercel's REMOTE builder (plain
+# `vercel deploy --prod`), NOT `vercel build` + `--prebuilt`. The serverless
+# entrypoint (src/main.ts default export on @vercel/node) is not reproduced
+# correctly by a local prebuilt output — a prebuilt deploy returns 404
+# NOT_FOUND on every route. Keep the remote build. (cf. CLAUDE.md main.ts note.)
+#
+# Requires repo secrets VERCEL_ORG_ID, VERCEL_PROJECT_ID and VERCEL_TOKEN
+# (create the token at vercel.com/account/tokens).
 
 on:
   push:
@@ -24,9 +29,5 @@ jobs:
           node-version: 20
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
-      - name: Pull Vercel project settings
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-      - name: Build
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-      - name: Deploy prebuilt output to production
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Deploy to production (remote build)
+        run: vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
