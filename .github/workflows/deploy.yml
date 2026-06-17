@@ -1,11 +1,14 @@
 name: Deploy to Vercel (production)
 
 # Real auto-deploy: every push to main ships to production via the Vercel CLI.
-# IMPORTANT: this backend deploys with Vercel's REMOTE builder (plain
-# `vercel deploy --prod`), NOT `vercel build` + `--prebuilt`. The serverless
-# entrypoint (src/main.ts default export on @vercel/node) is not reproduced
-# correctly by a local prebuilt output — a prebuilt deploy returns 404
-# NOT_FOUND on every route. Keep the remote build. (cf. CLAUDE.md main.ts note.)
+#
+# CRITICAL: vercel.json uses a legacy `builds` config that serves a PREBUILT
+# `dist/main.js` and runs NO compilation on Vercel. So `dist/` must be built
+# here and uploaded with the deploy. A clean checkout has no `dist/` (it's
+# git-ignored), so skipping `yarn build` ships a deployment with no serverless
+# function → 404 NOT_FOUND on every route. Vercel uploads `dist/` even though
+# it's in .gitignore (it only honors .vercelignore). Do NOT use --prebuilt:
+# `vercel build` can't bundle dist/main.js until `yarn build` has produced it.
 #
 # Requires repo secrets VERCEL_ORG_ID, VERCEL_PROJECT_ID and VERCEL_TOKEN
 # (create the token at vercel.com/account/tokens).
@@ -27,7 +30,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      - name: Build (produces dist/ that vercel.json deploys)
+        run: yarn build
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
-      - name: Deploy to production (remote build)
+      - name: Deploy to production (remote build, uploads dist/)
         run: vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
