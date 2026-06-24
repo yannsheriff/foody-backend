@@ -11,5 +11,11 @@
       "src": "/(.*)",
       "dest": "dist/main.js"
     }
+  ],
+  "crons": [
+    {
+      "path": "/cron/reminders",
+      "schedule": "30 19 * * *"
+    }
   ]
 }

@@ -16,14 +16,31 @@ enum Score {
 }
 
 model User {
-  id         Int             @id @default(autoincrement())
-  email      String          @unique
-  name       String
-  password   String
-  days       Days[]
-  challenges UserChallenge[]
+  id            Int                @id @default(autoincrement())
+  email         String             @unique
+  name          String
+  password      String
+  days          Days[]
+  challenges    UserChallenge[]
+  subscriptions PushSubscription[]
 
   @@map("users")
+}
+
+// One row per device/browser the user enabled reminders on (a user can have
+// several). Stores the Web Push subscription returned by the browser; the
+// daily reminder cron sends to every row whose owner hasn't completed today.
+model PushSubscription {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  created_at DateTime @default(now())
+  user       User     @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@map("push_subscriptions")
 }
 
 // Single-word lowercase values on purpose: Prisma identifier, DB string and

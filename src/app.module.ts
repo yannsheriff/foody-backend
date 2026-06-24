@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { InsightsModule } from './insights/insights.module';
 import { ChallengesModule } from './challenges/challenges.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ChallengesModule } from './challenges/challenges.module';
     AuthModule,
     InsightsModule,
     ChallengesModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
