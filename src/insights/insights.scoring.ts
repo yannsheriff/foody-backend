@@ -1,6 +1,6 @@
 import { Days, Score, SportLevel } from '@prisma/client';
 
-const MEAL_POINTS: Record<Score, number> = {
+export const MEAL_POINTS: Record<Score, number> = {
   tresLeger: 2.5,
   leger: 2.25,
   normal: 1.5,
@@ -11,7 +11,7 @@ const MEAL_POINTS: Record<Score, number> = {
 // Mirrors SPORT_LEVELS in foody/src/lib/meal-levels.ts — keep the point values
 // in sync across the two scoring implementations. The total score is still
 // capped at 10, so intense (+3) just gives more headroom to reach a perfect day.
-const SPORT_POINTS: Record<SportLevel, number> = {
+export const SPORT_POINTS: Record<SportLevel, number> = {
   none: 0,
   normal: 2,
   intense: 3,
