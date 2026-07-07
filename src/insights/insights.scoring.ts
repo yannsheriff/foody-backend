@@ -86,16 +86,21 @@ export function countsForStreak(day: Days): boolean {
   return day.meals_completed_at.getTime() <= graceDeadline(day.date).getTime();
 }
 
+// Convention de dates du backend : tout est en jour calendaire UTC — les
+// fenêtres de days.service, l'index days_one_per_user_day et ces helpers.
+// En prod (Vercel) le fuseau serveur est déjà UTC, l'explicite aligne le dev
+// local. Seule exception assumée : notifications.service (parisYmd), qui
+// raisonne en Europe/Paris car les rappels push sont à heure locale humaine.
 export function ymd(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(date.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
 
 export function startOfDay(date: Date): Date {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
+  d.setUTCHours(0, 0, 0, 0);
   return d;
 }
 

@@ -76,8 +76,8 @@ export class InsightsService {
     const monthDays = days.filter((d) => {
       const date = new Date(d.date);
       return (
-        date.getFullYear() === now.getFullYear() &&
-        date.getMonth() === now.getMonth() &&
+        date.getUTCFullYear() === now.getUTCFullYear() &&
+        date.getUTCMonth() === now.getUTCMonth() &&
         isDayFullyTracked(d)
       );
     });
@@ -111,14 +111,15 @@ export class InsightsService {
   }
 
   async getStats(userId: number, monthParam?: string): Promise<StatsDto> {
-    const days = await this.loadDays(userId);
     const target = this.parseMonth(monthParam);
-    const monthDays = days.filter((d) => {
-      const date = new Date(d.date);
-      return (
-        date.getFullYear() === target.getFullYear() &&
-        date.getMonth() === target.getMonth()
-      );
+    const nextMonth = new Date(
+      Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 1),
+    );
+    // Seul le mois demandé est chargé — les stats n'ont pas besoin de tout
+    // l'historique (contrairement au streak record, cf. loadDays).
+    const monthDays = await this.loadDays(userId, {
+      gte: target,
+      lt: nextMonth,
     });
 
     const tracked = monthDays.filter(isDayFullyTracked);
@@ -184,11 +185,11 @@ export class InsightsService {
 
     // Insight: weekend vs weekday
     const weekend = tracked.filter((d) => {
-      const day = new Date(d.date).getDay();
+      const day = new Date(d.date).getUTCDay();
       return day === 0 || day === 6;
     });
     const weekday = tracked.filter((d) => {
-      const day = new Date(d.date).getDay();
+      const day = new Date(d.date).getUTCDay();
       return day !== 0 && day !== 6;
     });
     let insight = null;
@@ -211,9 +212,16 @@ export class InsightsService {
     return { average, optimalDays, repartition, weeklyTrend, insight };
   }
 
-  private async loadDays(userId: number): Promise<Days[]> {
+  // Sans fenêtre, charge tout l'historique : streak/records/badges en ont
+  // réellement besoin (le record de flamme est un max sur la vie entière).
+  // Compromis assumé tant que les historiques restent petits (~quelques
+  // centaines de jours) ; à revoir si un historique dépasse plusieurs années.
+  private async loadDays(
+    userId: number,
+    dateWindow?: { gte: Date; lt: Date },
+  ): Promise<Days[]> {
     return this.prisma.days.findMany({
-      where: { user_id: userId },
+      where: { user_id: userId, ...(dateWindow && { date: dateWindow }) },
       orderBy: { date: 'asc' },
     });
   }
@@ -241,7 +249,7 @@ export class InsightsService {
 
   private weekNumber(date: Date): number {
     const d = new Date(
-      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
     );
     const dayNum = d.getUTCDay() || 7;
     d.setUTCDate(d.getUTCDate() + 4 - dayNum);
@@ -254,10 +262,10 @@ export class InsightsService {
   private parseMonth(input?: string): Date {
     if (input && /^\d{4}-\d{2}$/.test(input)) {
       const [y, m] = input.split('-').map(Number);
-      return new Date(y, m - 1, 1);
+      return new Date(Date.UTC(y, m - 1, 1));
     }
     const n = new Date();
-    return new Date(n.getFullYear(), n.getMonth(), 1);
+    return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), 1));
   }
 
   private fmt(n: number): string {

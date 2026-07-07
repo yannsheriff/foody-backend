@@ -18,15 +18,13 @@ function mkDay(over: Partial<Days> & { date: Date }): Days {
 
 describe('graceDeadline', () => {
   it('is D+1 at 23h30', () => {
-    const d = new Date(2026, 5, 10, 14, 12);
-    expect(graceDeadline(d).getTime()).toBe(
-      new Date(2026, 5, 11, 23, 30).getTime(),
-    );
+    const d = new Date(Date.UTC(2026, 5, 10, 14, 12));
+    expect(graceDeadline(d).getTime()).toBe(Date.UTC(2026, 5, 11, 23, 30));
   });
 });
 
 describe('countsForStreak', () => {
-  const day = startOfDay(new Date(2026, 5, 10));
+  const day = startOfDay(new Date(Date.UTC(2026, 5, 10)));
 
   it('grandfathers rows without a timestamp', () => {
     expect(countsForStreak(mkDay({ date: day }))).toBe(true);
@@ -37,7 +35,7 @@ describe('countsForStreak', () => {
       countsForStreak(
         mkDay({
           date: day,
-          meals_completed_at: new Date(2026, 5, 10, 20, 0),
+          meals_completed_at: new Date(Date.UTC(2026, 5, 10, 20, 0)),
         }),
       ),
     ).toBe(true);
@@ -48,7 +46,7 @@ describe('countsForStreak', () => {
       countsForStreak(
         mkDay({
           date: day,
-          meals_completed_at: new Date(2026, 5, 11, 23, 30, 0, 0),
+          meals_completed_at: new Date(Date.UTC(2026, 5, 11, 23, 30, 0, 0)),
         }),
       ),
     ).toBe(true);
@@ -59,7 +57,7 @@ describe('countsForStreak', () => {
       countsForStreak(
         mkDay({
           date: day,
-          meals_completed_at: new Date(2026, 5, 11, 23, 31),
+          meals_completed_at: new Date(Date.UTC(2026, 5, 11, 23, 31)),
         }),
       ),
     ).toBe(false);

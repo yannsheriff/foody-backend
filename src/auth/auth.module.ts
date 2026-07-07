@@ -13,7 +13,9 @@ import { jwtSecret } from './jwt.config';
     PassportModule,
     JwtModule.register({
       secret: jwtSecret(),
-      signOptions: { expiresIn: '1y' },
+      // 90 jours : compromis rotation/friction — pas de refresh token, donc
+      // l'expiration = re-login (le front gère le 401 → /login proprement).
+      signOptions: { expiresIn: '90d' },
     }),
   ],
   providers: [AuthService, JwtStrategy],
