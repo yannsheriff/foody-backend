@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as express from 'express';
@@ -12,7 +13,18 @@ let initPromise: Promise<void> | null = null;
 async function init(): Promise<void> {
   const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
 
-  app.enableCors();
+  // Browser clients are the PWA (prod) and the vite dev server; native apps
+  // and server-side scripts don't send an Origin and are unaffected by CORS.
+  app.enableCors({
+    origin: [
+      'https://foody-fawn-three.vercel.app',
+      /^http:\/\/localhost(:\d+)?$/,
+    ],
+  });
+
+  // whitelist strips unknown body props (e.g. a client can never inject
+  // meals_completed_at); no forbidNonWhitelisted so older clients keep working.
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   const config = new DocumentBuilder()
     .setTitle('Foody API')

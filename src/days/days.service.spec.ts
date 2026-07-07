@@ -69,7 +69,7 @@ describe('DaysService.update', () => {
     prisma.days.findUnique.mockResolvedValue(
       mkRow({ morning_score: 'leger', afternoon_score: 'normal' }),
     );
-    await service.update(1, { evening_score: 'copieux' } as never);
+    await service.update(1, { evening_score: 'copieux' } as never, 1);
     const data = prisma.days.update.mock.calls[0][0].data;
     expect(data.meals_completed_at).toBeInstanceOf(Date);
   });
@@ -84,7 +84,7 @@ describe('DaysService.update', () => {
         meals_completed_at: new Date('2026-06-01T12:00:00Z'),
       }),
     );
-    await service.update(1, { morning_score: 'tres-copieux' } as never);
+    await service.update(1, { morning_score: 'tres-copieux' } as never, 1);
     const data = prisma.days.update.mock.calls[0][0].data;
     expect('meals_completed_at' in data).toBe(false);
   });
@@ -99,7 +99,7 @@ describe('DaysService.update', () => {
         meals_completed_at: new Date('2026-06-01T12:00:00Z'),
       }),
     );
-    await service.update(1, { evening_score: null } as never);
+    await service.update(1, { evening_score: null } as never, 1);
     const data = prisma.days.update.mock.calls[0][0].data;
     expect('meals_completed_at' in data).toBe(false);
     expect(data.evening_score).toBeNull();
@@ -108,9 +108,18 @@ describe('DaysService.update', () => {
   it('does not stamp a still-incomplete update', async () => {
     const { service, prisma } = mkService();
     prisma.days.findUnique.mockResolvedValue(mkRow({ morning_score: 'leger' }));
-    await service.update(1, { afternoon_score: 'normal' } as never);
+    await service.update(1, { afternoon_score: 'normal' } as never, 1);
     const data = prisma.days.update.mock.calls[0][0].data;
     expect('meals_completed_at' in data).toBe(false);
+  });
+
+  it("rejects updating another user's day with a 404", async () => {
+    const { service, prisma } = mkService();
+    prisma.days.findUnique.mockResolvedValue(mkRow({ user_id: 1 }));
+    await expect(
+      service.update(1, { morning_score: 'leger' } as never, 999),
+    ).rejects.toThrow('not found');
+    expect(prisma.days.update).not.toHaveBeenCalled();
   });
 });
 

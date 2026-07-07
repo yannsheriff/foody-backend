@@ -5,10 +5,11 @@ import {
   Body,
   Patch,
   Param,
-  Delete,
   ParseIntPipe,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { DaysService } from './days.service';
 import { CreateDayDto } from './dto/create-day.dto';
 import { UpdateDayDto } from './dto/update-day.dto';
@@ -22,6 +23,10 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UserGuard } from './guards/user-days.guard';
+
+interface AuthedRequest extends Request {
+  user: { id: number };
+}
 
 @ApiTags('days')
 @Controller('days')
@@ -44,22 +49,6 @@ export class DaysController {
   @ApiBody({ type: CreateDayDto })
   create(@Body() createDayDto: CreateDayDto) {
     return this.daysService.createDay(createDayDto);
-  }
-
-  @Get()
-  @ApiOperation({ summary: 'Récupérer tous les jours' })
-  @ApiResponse({ status: 200, description: 'Liste des jours récupérée.' })
-  findAll() {
-    return this.daysService.findAll();
-  }
-
-  @Get(':id')
-  @ApiOperation({ summary: 'Récupérer un jour par son ID' })
-  @ApiParam({ name: 'id', description: 'ID du jour' })
-  @ApiResponse({ status: 200, description: 'Jour trouvé.' })
-  @ApiResponse({ status: 404, description: 'Jour non trouvé.' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.daysService.findOne(id);
   }
 
   @Get('user/:userId')
@@ -87,24 +76,21 @@ export class DaysController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Mettre à jour un jour' })
+  @ApiOperation({
+    summary: 'Mettre à jour un jour (du user authentifié uniquement)',
+  })
   @ApiParam({ name: 'id', description: 'ID du jour' })
   @ApiBody({ type: UpdateDayDto })
   @ApiResponse({ status: 200, description: 'Jour mis à jour.' })
-  @ApiResponse({ status: 404, description: 'Jour non trouvé.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Jour non trouvé (ou appartenant à un autre utilisateur).',
+  })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDayDto: UpdateDayDto,
+    @Req() req: AuthedRequest,
   ) {
-    return this.daysService.update(id, updateDayDto);
-  }
-
-  @Delete(':id')
-  @ApiOperation({ summary: 'Supprimer un jour' })
-  @ApiParam({ name: 'id', description: 'ID du jour' })
-  @ApiResponse({ status: 200, description: 'Jour supprimé.' })
-  @ApiResponse({ status: 404, description: 'Jour non trouvé.' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.daysService.remove(id);
+    return this.daysService.update(id, updateDayDto, req.user.id);
   }
 }

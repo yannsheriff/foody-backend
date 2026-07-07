@@ -14,11 +14,6 @@ export class UserGuard implements CanActivate {
     const body = request.body;
 
     // Vérifier l'ID utilisateur dans les paramètres de route
-    console.log(
-      '🚀 ~ UserGuard ~ canActivate ~ user.id:',
-      user.id,
-      params.userId,
-    );
     if (params.userId && parseInt(params.userId) !== user.id) {
       throw new UnauthorizedException("Vous n'avez pas accès à ces données");
     }

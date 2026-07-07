@@ -40,10 +40,14 @@ export class UsersService {
 
   async update(id: number, updateUserDto: UpdateUserDto) {
     await this.findOne(id);
-    const hashedPassword = await bcrypt.hash(updateUserDto.password, 10);
+    // password est optionnel : ne le hasher (et ne l'écrire) que s'il est fourni.
+    const data: UpdateUserDto = { ...updateUserDto };
+    if (updateUserDto.password) {
+      data.password = await bcrypt.hash(updateUserDto.password, 10);
+    }
     const user = await this.prisma.user.update({
       where: { id },
-      data: { ...updateUserDto, password: hashedPassword },
+      data,
     });
     return this.excludePassword(user);
   }

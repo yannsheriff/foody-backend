@@ -21,7 +21,7 @@ export class DaysService {
     // creating a duplicate — a stale client-side lookup must not fork the day.
     const date = data.date ? new Date(data.date) : new Date();
     const existing = await this.findDayInUtcWindow(data.user_id, date);
-    if (existing) return this.update(existing.id, data);
+    if (existing) return this.update(existing.id, data, data.user_id);
     try {
       return await this.insertDay(data, date);
     } catch (e) {
@@ -29,7 +29,7 @@ export class DaysService {
       if ((e as { code?: string }).code !== 'P2002') throw e;
       const winner = await this.findDayInUtcWindow(data.user_id, date);
       if (!winner) throw e;
-      return this.update(winner.id, data);
+      return this.update(winner.id, data, data.user_id);
     }
   }
 
@@ -73,16 +73,6 @@ export class DaysService {
     });
   }
 
-  async findAll(): Promise<DayWire[]> {
-    const rows = await this.prisma.days.findMany();
-    return rows.map(toWire);
-  }
-
-  async findOne(id: number): Promise<DayWire> {
-    const day = await this.loadOne(id);
-    return toWire(day);
-  }
-
   async getDaysByUserId(userId: number): Promise<DayWire[]> {
     const rows = await this.prisma.days.findMany({
       where: { user_id: userId },
@@ -91,8 +81,17 @@ export class DaysService {
     return rows.map(toWire);
   }
 
-  async update(id: number, data: UpdateDayDto): Promise<DayWire> {
+  async update(
+    id: number,
+    data: UpdateDayDto,
+    requesterId: number,
+  ): Promise<DayWire> {
     const existing = await this.loadOne(id);
+    // Ownership: un 404 plutôt qu'un 403 pour ne pas révéler l'existence du
+    // jour d'un autre utilisateur.
+    if (existing.user_id !== requesterId) {
+      throw new NotFoundException(`Day with ID ${id} not found`);
+    }
     const morning =
       data.morning_score !== undefined
         ? toPrismaScore(data.morning_score)
@@ -141,12 +140,6 @@ export class DaysService {
       },
     });
     return toWire(updated);
-  }
-
-  async remove(id: number): Promise<DayWire> {
-    await this.loadOne(id);
-    const deleted = await this.prisma.days.delete({ where: { id } });
-    return toWire(deleted);
   }
 
   async getOrCreateTodayForUser(userId: number): Promise<DayWire> {

@@ -99,7 +99,7 @@ Generate code, corrections, and refactorings that comply with the basic principl
   - One controller for its route.
     - And other controllers for secondary routes.
   - A models folder with data types.
-    - DTOs validated with class-validator for inputs.
+    - DTOs validated with class-validator + a global ValidationPipe (whitelist: true) in main.ts.
     - Declare simple types for outputs.
   - A services module with business logic and persistence.
     - Entities with MikroORM for data persistence.
