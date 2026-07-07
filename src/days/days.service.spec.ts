@@ -114,6 +114,34 @@ describe('DaysService.update', () => {
   });
 });
 
+describe('DaysService.createDay (idempotent par jour)', () => {
+  it('merges into the existing row of the same UTC day instead of duplicating', async () => {
+    const { service, prisma } = mkService();
+    const existing = mkRow({ id: 105, date: new Date('2026-07-06T00:00:00Z') });
+    prisma.days.findFirst.mockResolvedValue(existing);
+    prisma.days.findUnique.mockResolvedValue(existing);
+    await service.createDay({
+      user_id: 1,
+      date: new Date('2026-07-06T12:00:00Z'),
+      morning_score: 'leger',
+    } as never);
+    expect(prisma.days.create).not.toHaveBeenCalled();
+    expect(prisma.days.update.mock.calls[0][0].where).toEqual({ id: 105 });
+  });
+
+  it('recovers from a P2002 race by merging into the winner', async () => {
+    const { service, prisma } = mkService();
+    const winner = mkRow({ id: 7 });
+    prisma.days.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(winner);
+    prisma.days.create.mockRejectedValue({ code: 'P2002' });
+    prisma.days.findUnique.mockResolvedValue(winner);
+    await service.createDay({ user_id: 1, morning_score: 'leger' } as never);
+    expect(prisma.days.update.mock.calls[0][0].where).toEqual({ id: 7 });
+  });
+});
+
 describe('DaysService.getOrCreateTodayForUser', () => {
   it('creates the empty day without a stamp', async () => {
     const { service, prisma } = mkService();

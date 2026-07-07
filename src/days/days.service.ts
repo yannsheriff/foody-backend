@@ -16,6 +16,24 @@ export class DaysService {
   constructor(private prisma: PrismaService) {}
 
   async createDay(data: CreateDayDto): Promise<DayWire> {
+    // Idempotent per user per calendar day: if a row already covers that day,
+    // the provided fields are merged into it (same rules as PATCH) instead of
+    // creating a duplicate — a stale client-side lookup must not fork the day.
+    const date = data.date ? new Date(data.date) : new Date();
+    const existing = await this.findDayInUtcWindow(data.user_id, date);
+    if (existing) return this.update(existing.id, data);
+    try {
+      return await this.insertDay(data, date);
+    } catch (e) {
+      // days_one_per_user_day: a concurrent create won the race — merge into it.
+      if ((e as { code?: string }).code !== 'P2002') throw e;
+      const winner = await this.findDayInUtcWindow(data.user_id, date);
+      if (!winner) throw e;
+      return this.update(winner.id, data);
+    }
+  }
+
+  private async insertDay(data: CreateDayDto, date: Date): Promise<DayWire> {
     const morning = toPrismaScore(data.morning_score ?? null);
     const afternoon = toPrismaScore(data.afternoon_score ?? null);
     const evening = toPrismaScore(data.evening_score ?? null);
@@ -31,7 +49,7 @@ export class DaysService {
         sport_level: sportLevel,
         sport: sportBool(sportLevel),
         sport_type: data.sport_type ?? null,
-        date: data.date ?? new Date(),
+        date,
         // Stamped at write time; lateness vs the day's own date is judged at
         // read time (countsForStreak), so a backfilled day is excluded there.
         ...(morning != null &&
@@ -40,6 +58,19 @@ export class DaysService {
       },
     });
     return toWire(created);
+  }
+
+  // The window is UTC-based to match the days_one_per_user_day unique index
+  // (date_trunc on a tz-less timestamp). orderBy keeps the pick deterministic
+  // for legacy duplicates that predate the index.
+  private findDayInUtcWindow(userId: number, date: Date): Promise<Days | null> {
+    const start = new Date(date);
+    start.setUTCHours(0, 0, 0, 0);
+    const end = new Date(start.getTime() + 86_400_000);
+    return this.prisma.days.findFirst({
+      where: { user_id: userId, date: { gte: start, lt: end } },
+      orderBy: { id: 'asc' },
+    });
   }
 
   async findAll(): Promise<DayWire[]> {
@@ -119,26 +150,27 @@ export class DaysService {
   }
 
   async getOrCreateTodayForUser(userId: number): Promise<DayWire> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today.getTime() + 86_400_000);
-
-    const existingDay = await this.prisma.days.findFirst({
-      where: {
-        user_id: userId,
-        date: { gte: today, lt: tomorrow },
-      },
-    });
-
+    const now = new Date();
+    const existingDay = await this.findDayInUtcWindow(userId, now);
     if (existingDay) return toWire(existingDay);
 
-    const created = await this.prisma.days.create({
-      data: {
-        user_id: userId,
-        date: today,
-      },
-    });
-    return toWire(created);
+    const today = new Date(now);
+    today.setUTCHours(0, 0, 0, 0);
+    try {
+      const created = await this.prisma.days.create({
+        data: {
+          user_id: userId,
+          date: today,
+        },
+      });
+      return toWire(created);
+    } catch (e) {
+      // days_one_per_user_day: a concurrent open-today won the race.
+      if ((e as { code?: string }).code !== 'P2002') throw e;
+      const winner = await this.findDayInUtcWindow(userId, now);
+      if (!winner) throw e;
+      return toWire(winner);
+    }
   }
 
   private async loadOne(id: number): Promise<Days> {

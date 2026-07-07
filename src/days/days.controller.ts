@@ -31,8 +31,15 @@ export class DaysController {
   constructor(private readonly daysService: DaysService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Créer un nouveau jour' })
-  @ApiResponse({ status: 201, description: 'Jour créé avec succès.' })
+  @ApiOperation({
+    summary: 'Créer un jour (idempotent par utilisateur et jour calendaire)',
+    description:
+      'Si un jour existe déjà pour cet utilisateur à cette date (fenêtre UTC), les champs fournis y sont fusionnés — mêmes règles que PATCH — au lieu de créer un doublon.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Jour créé (ou jour existant fusionné et renvoyé).',
+  })
   @ApiResponse({ status: 400, description: 'Requête invalide.' })
   @ApiBody({ type: CreateDayDto })
   create(@Body() createDayDto: CreateDayDto) {
