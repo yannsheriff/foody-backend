@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 
 export class CreateUserDto {
@@ -6,6 +7,11 @@ export class CreateUserDto {
     description: "L'email de l'utilisateur",
     example: 'john.doe@example.com',
   })
+  // Stocké en minuscules (+ trim) pour que la connexion soit insensible à
+  // la casse (comparaison exacte Prisma côté login).
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   @IsEmail()
   email: string;
 
