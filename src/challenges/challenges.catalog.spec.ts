@@ -52,7 +52,8 @@ function successScenario(def: (typeof CHALLENGE_CATALOG)[number]): Scenario {
       const sat = new Date(FIRST_SATURDAY.getTime() + k * 7 * DAY);
       days.push(perfectDay(sat), perfectDay(new Date(sat.getTime() + DAY)));
     }
-    const lastSunday = FIRST_SATURDAY.getTime() + (def.total - 1) * 7 * DAY + DAY;
+    const lastSunday =
+      FIRST_SATURDAY.getTime() + (def.total - 1) * 7 * DAY + DAY;
     return { days, now: new Date(lastSunday + DAY) };
   }
   const days = Array.from({ length: def.total }, (_, i) =>
@@ -90,7 +91,8 @@ describe('catalogue — intégrité', () => {
       expect(def.goal).toContain(String(def.total));
       expect(def.total).toBeGreaterThan(0);
       if (def.kind === 'note') expect(def.minScore).toBeGreaterThan(0);
-      if (def.kind === 'sport') expect(def.windowDays).toBeGreaterThanOrEqual(7);
+      if (def.kind === 'sport')
+        expect(def.windowDays).toBeGreaterThanOrEqual(7);
       if (def.windowDays) {
         // La fenêtre doit pouvoir contenir le total (séances quotidiennes /
         // week-ends hebdomadaires).
