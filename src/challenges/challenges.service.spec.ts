@@ -72,7 +72,7 @@ function mkService(
 const level1Done = ['saisie-3', 'grignotage-3', 'note-6-3', 'sport-2-semaine'];
 
 describe('ChallengesService.getHub', () => {
-  it('fresh user: no active, level 1 current with 4 todo, 2-4 locked', async () => {
+  it('fresh user: no active, level 1 current with 7 todo, 2-4 locked', async () => {
     const { service } = mkService([], []);
     const hub = await service.getHub(1);
     expect(hub.active).toBeNull();
@@ -82,15 +82,16 @@ describe('ChallengesService.getHub', () => {
       'locked',
       'locked',
     ]);
+    expect(hub.levels[0].required).toBe(4);
     expect(hub.levels[0].items.map((i) => i.state)).toEqual(
-      Array(4).fill('todo'),
+      Array(7).fill('todo'),
     );
     expect(hub.levels[1].items.map((i) => i.state)).toEqual(
-      Array(4).fill('locked'),
+      Array(7).fill('locked'),
     );
   });
 
-  it('level 1 fully completed unlocks level 2', async () => {
+  it('4 challenges done validate level 1 and unlock level 2', async () => {
     const rows = level1Done.map((id) =>
       mkRow({ challenge_id: id, status: 'completed', completed_at: dayAt(3) }),
     );
@@ -102,8 +103,14 @@ describe('ChallengesService.getHub', () => {
       'locked',
       'locked',
     ]);
-    expect(hub.levels[0].items.every((i) => i.state === 'done')).toBe(true);
-    expect(hub.levels[0].items[0].completedAt).toBeDefined();
+    // Les 4 relevés sont done ; les 3 restants du niveau validé restent todo
+    // (démarrables en bonus), pas locked.
+    const states = hub.levels[0].items.map((i) => i.state);
+    expect(states.filter((s) => s === 'done')).toHaveLength(4);
+    expect(states.filter((s) => s === 'todo')).toHaveLength(3);
+    expect(
+      hub.levels[0].items.find((i) => i.id === 'saisie-3')?.completedAt,
+    ).toBeDefined();
   });
 
   it('exposes the active challenge with progress and left label', async () => {
@@ -148,7 +155,7 @@ describe('ChallengesService.getHub', () => {
     expect(hub.active).toMatchObject({ id: 'saisie-3', prog: 3, total: 3 });
   });
 
-  it('all 16 done: every level done, no current', async () => {
+  it('4 done per level: every level done, no current', async () => {
     const rows = [
       'saisie-3',
       'grignotage-3',
@@ -212,6 +219,38 @@ describe('ChallengesService.start', () => {
     await expect(service.start(1, 'saisie-14')).rejects.toMatchObject({
       status: 409,
     });
+  });
+
+  it('409 while the previous level has only 3 of 4 required', async () => {
+    const rows = level1Done.slice(0, 3).map((id) =>
+      mkRow({
+        challenge_id: id,
+        status: 'completed',
+        completed_at: dayAt(1),
+      }),
+    );
+    const { service } = mkService([], rows);
+    await expect(service.start(1, 'note-7-5')).rejects.toMatchObject({
+      status: 409,
+    });
+  });
+
+  it('a level-2 challenge starts once 4 of level 1 are done', async () => {
+    const rows = level1Done.map((id) =>
+      mkRow({ challenge_id: id, status: 'completed', completed_at: dayAt(1) }),
+    );
+    const { service } = mkService([], rows);
+    const active = await service.start(1, 'note-7-5');
+    expect(active.id).toBe('note-7-5');
+  });
+
+  it('a leftover challenge of a validated level stays startable (bonus)', async () => {
+    const rows = level1Done.map((id) =>
+      mkRow({ challenge_id: id, status: 'completed', completed_at: dayAt(1) }),
+    );
+    const { service } = mkService([], rows);
+    const active = await service.start(1, 'soir-leger-3');
+    expect(active.id).toBe('soir-leger-3');
   });
 
   it('409 when another challenge is active', async () => {

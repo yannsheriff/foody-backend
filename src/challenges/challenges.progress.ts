@@ -19,6 +19,9 @@ export interface ChallengeProgress {
   done: boolean;
 }
 
+// Default minimum per-day score of a « week-end sans écart ».
+export const WEEKEND_MIN_SCORE = 6.5;
+
 function qualifies(def: ChallengeDef, d: Days): boolean {
   switch (def.kind) {
     case 'saisie':
@@ -32,6 +35,16 @@ function qualifies(def: ChallengeDef, d: Days): boolean {
     case 'sport':
       // A real session counts as a sport day; repos (none) / unanswered doesn't.
       return d.sport_level === 'normal' || d.sport_level === 'intense';
+    case 'soir-leger':
+      // Dinner at léger or below; an unlogged dinner doesn't qualify.
+      return d.evening_score === 'tresLeger' || d.evening_score === 'leger';
+    case 'weekend':
+      // Per-day rule of a weekend day — the Sat+Sun pairing happens in
+      // computeWeekendProgress.
+      return (
+        isDayFullyTracked(d) &&
+        computeDayScore(d) >= (def.minScore ?? WEEKEND_MIN_SCORE)
+      );
   }
 }
 
@@ -154,6 +167,57 @@ export function computeSportProgress(
   return { prog: Math.min(trailing, def.total), done: false };
 }
 
+// Weekend: a weekend qualifies when its Saturday AND Sunday both qualify
+// (fully tracked + score ≥ minScore). Displayed progress may count a weekend
+// closing today; completion only fires once the closing Sunday is fully
+// elapsed (≤ yesterday) — same « validé à minuit » rule as the other kinds.
+// Windowed variants (« 3 week-ends dans le mois ») mirror the sport logic on
+// the weekends' Sunday dates. Day-of-week is UTC, like every backend date.
+export function computeWeekendProgress(
+  days: Days[],
+  def: ChallengeDef,
+  startedAt: Date,
+  now: Date = new Date(),
+): ChallengeProgress {
+  const start = startOfDay(startedAt);
+  const today = startOfDay(now);
+  const yesterday = new Date(today.getTime() - 86_400_000);
+  const index = qualifyingDayIndex(days, def, start, today);
+
+  // Sundays of qualifying weekends since the start, ascending.
+  const sundays: Date[] = [];
+  for (
+    let cursor = new Date(start.getTime());
+    cursor.getTime() <= today.getTime();
+    cursor = new Date(cursor.getTime() + 86_400_000)
+  ) {
+    if (cursor.getUTCDay() !== 6) continue;
+    const sunday = new Date(cursor.getTime() + 86_400_000);
+    if (sunday.getTime() > today.getTime()) break;
+    if (index.get(ymd(cursor)) === true && index.get(ymd(sunday)) === true) {
+      sundays.push(sunday);
+    }
+  }
+
+  const elapsed = sundays.filter((d) => d.getTime() <= yesterday.getTime());
+
+  if (!def.windowDays) {
+    return {
+      prog: Math.min(sundays.length, def.total),
+      done: elapsed.length >= def.total,
+    };
+  }
+
+  const done = hasSportWindow(elapsed, def.total, def.windowDays);
+  const full = done || hasSportWindow(sundays, def.total, def.windowDays);
+  if (full) return { prog: def.total, done };
+
+  const trailing = sundays.filter(
+    (d) => diffDays(today, d) < (def.windowDays as number),
+  ).length;
+  return { prog: Math.min(trailing, def.total), done: false };
+}
+
 export function computeChallengeProgress(
   def: ChallengeDef,
   days: Days[],
@@ -162,6 +226,9 @@ export function computeChallengeProgress(
 ): ChallengeProgress {
   if (def.kind === 'sport') {
     return computeSportProgress(days, def, startedAt, now);
+  }
+  if (def.kind === 'weekend') {
+    return computeWeekendProgress(days, def, startedAt, now);
   }
   const run = computeConsecutiveProgress(days, def, startedAt, now);
   const done = hasCompletedConsecutiveRun(
@@ -177,6 +244,12 @@ export function leftLabel(def: ChallengeDef, prog: number): string {
   const n = Math.max(def.total - prog, 0);
   if (def.kind === 'sport') {
     return `Encore ${n} séance${n > 1 ? 's' : ''}`;
+  }
+  if (def.kind === 'weekend') {
+    return `Encore ${n} week-end${n > 1 ? 's' : ''}`;
+  }
+  if (def.kind === 'soir-leger') {
+    return `Encore ${n} soir${n > 1 ? 's' : ''}`;
   }
   return `Encore ${n} jour${n > 1 ? 's' : ''}`;
 }

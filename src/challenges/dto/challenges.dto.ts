@@ -13,6 +13,12 @@ export class ActiveChallengeDto {
   @ApiProperty({ description: 'Libellé du type de défi', example: 'Copieux' })
   kind: string;
 
+  @ApiProperty({
+    description: 'Identifiant technique du type (catalogue)',
+    example: 'copieux',
+  })
+  kindId: string;
+
   @ApiProperty({ example: '5 jours' })
   goal: string;
 
@@ -47,6 +53,12 @@ export class ChallengeItemDto {
 
   @ApiProperty({ description: 'Libellé du type de défi', example: 'Copieux' })
   kind: string;
+
+  @ApiProperty({
+    description: 'Identifiant technique du type (catalogue)',
+    example: 'copieux',
+  })
+  kindId: string;
 
   @ApiProperty({ example: '5 jours' })
   goal: string;
@@ -112,6 +124,12 @@ export class ChallengeLevelDto {
 
   @ApiProperty({ enum: ['done', 'current', 'locked'] })
   state: 'done' | 'current' | 'locked';
+
+  @ApiProperty({
+    description: 'Nombre de défis à relever pour valider le niveau',
+    example: 4,
+  })
+  required: number;
 
   @ApiProperty({ type: [ChallengeItemDto] })
   items: ChallengeItemDto[];

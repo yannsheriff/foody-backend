@@ -9,6 +9,7 @@ import { ymd } from '../insights/insights.scoring';
 import {
   ChallengeDef,
   LEVELS,
+  REQUIRED_PER_LEVEL,
   challengeById,
   challengesForLevel,
 } from './challenges.constants';
@@ -38,7 +39,7 @@ export class ChallengesService {
 
     const levels: ChallengeLevelDto[] = LEVELS.map((lvl) => {
       const defs = challengesForLevel(lvl.n);
-      const levelDone = defs.every((d) => state.completedAt.has(d.id));
+      const levelDone = this.isLevelDone(defs, state.completedAt);
       const levelState: ChallengeLevelDto['state'] = levelDone
         ? 'done'
         : lvl.n === currentLevel
@@ -51,6 +52,7 @@ export class ChallengesService {
         title: lvl.title,
         tagline: lvl.tagline,
         state: levelState,
+        required: REQUIRED_PER_LEVEL,
         items: defs.map((def) => this.toItem(def, levelState, state)),
       };
     });
@@ -69,7 +71,12 @@ export class ChallengesService {
     if (state.completedAt.has(id)) {
       throw new ConflictException('Défi déjà relevé');
     }
-    if (def.level !== this.currentLevel(state.completedAt)) {
+    // Démarrable : niveau en cours, ou niveau déjà validé (les défis restants
+    // d'un niveau bouclé restent disponibles en bonus).
+    const unlocked =
+      def.level === this.currentLevel(state.completedAt) ||
+      this.isLevelDone(challengesForLevel(def.level), state.completedAt);
+    if (!unlocked) {
       throw new ConflictException('Niveau verrouillé');
     }
     if (state.active) {
@@ -128,13 +135,22 @@ export class ChallengesService {
     return { days, rows, active, completedAt };
   }
 
-  // The single unlocked-but-unfinished level; null once all 16 are done.
+  // Un niveau est validé avec REQUIRED_PER_LEVEL défis relevés parmi ceux
+  // proposés (min avec la taille du niveau par sécurité).
+  private isLevelDone(
+    defs: ChallengeDef[],
+    completedAt: Map<string, Date>,
+  ): boolean {
+    const done = defs.filter((d) => completedAt.has(d.id)).length;
+    return done >= Math.min(REQUIRED_PER_LEVEL, defs.length);
+  }
+
+  // The single unlocked-but-unfinished level; null once every level is done.
   private currentLevel(completedAt: Map<string, Date>): number | null {
     for (const lvl of LEVELS) {
-      const done = challengesForLevel(lvl.n).every((d) =>
-        completedAt.has(d.id),
-      );
-      if (!done) return lvl.n;
+      if (!this.isLevelDone(challengesForLevel(lvl.n), completedAt)) {
+        return lvl.n;
+      }
     }
     return null;
   }
@@ -149,6 +165,7 @@ export class ChallengesService {
       emoji: def.emoji,
       title: def.title,
       kind: def.kindLabel,
+      kindId: def.kind,
       goal: def.goal,
       total: def.total,
       minScore: def.minScore,
@@ -178,6 +195,7 @@ export class ChallengesService {
       emoji: def.emoji,
       title: def.title,
       kind: def.kindLabel,
+      kindId: def.kind,
       goal: def.goal,
       level: def.level,
       prog,

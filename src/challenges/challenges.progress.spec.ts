@@ -42,11 +42,11 @@ function def(id: string): ChallengeDef {
 }
 
 describe('catalog', () => {
-  it('has 16 unique ids, 4 per level', () => {
-    expect(CHALLENGE_CATALOG).toHaveLength(16);
-    expect(new Set(CHALLENGE_CATALOG.map((c) => c.id)).size).toBe(16);
+  it('has 28 unique ids, 7 per level', () => {
+    expect(CHALLENGE_CATALOG).toHaveLength(28);
+    expect(new Set(CHALLENGE_CATALOG.map((c) => c.id)).size).toBe(28);
     for (const lvl of [1, 2, 3, 4]) {
-      expect(CHALLENGE_CATALOG.filter((c) => c.level === lvl)).toHaveLength(4);
+      expect(CHALLENGE_CATALOG.filter((c) => c.level === lvl)).toHaveLength(7);
     }
   });
 });
@@ -229,11 +229,125 @@ describe('sport (sessions within a rolling window)', () => {
   });
 });
 
+describe('soir-leger (consecutive light dinners)', () => {
+  const soir3 = def('soir-leger-3');
+
+  it('completes after 3 elapsed light dinners', () => {
+    // mkDay default evening is leger
+    const days = [1, 2, 3].map((o) => mkDay({ date: dayAt(o) }));
+    const { prog, done } = computeChallengeProgress(soir3, days, dayAt(3));
+    expect(prog).toBe(3);
+    expect(done).toBe(true);
+  });
+
+  it('a normal dinner before today resets the run', () => {
+    const days = [
+      mkDay({ date: dayAt(0) }),
+      mkDay({ date: dayAt(1), evening_score: 'normal' }),
+      mkDay({ date: dayAt(2) }),
+    ];
+    const { prog } = computeChallengeProgress(soir3, days, dayAt(2));
+    expect(prog).toBe(1);
+  });
+
+  it('an unlogged dinner does not qualify', () => {
+    const days = [mkDay({ date: dayAt(0), evening_score: null })];
+    expect(computeChallengeProgress(soir3, days, dayAt(0)).prog).toBe(0);
+  });
+});
+
+describe('weekend (qualifying Sat+Sun pairs)', () => {
+  // Dates fixes UTC — 2026-07-04 est un samedi.
+  const d = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+  const START = d('2026-07-01'); // mercredi
+  const SAT = '2026-07-04';
+  const SUN = '2026-07-05';
+  const weekend1 = def('weekend-1');
+
+  // mkDay default = leger/normal/leger + snack 0 → score 8 (≥ 6.5)
+  const okDay = (iso: string) => mkDay({ date: d(iso) });
+
+  it('a full qualifying weekend counts and completes once Sunday is elapsed', () => {
+    const days = [okDay(SAT), okDay(SUN)];
+    const monday = d('2026-07-06');
+    const { prog, done } = computeChallengeProgress(
+      weekend1,
+      days,
+      START,
+      monday,
+    );
+    expect(prog).toBe(1);
+    expect(done).toBe(true);
+  });
+
+  it('the in-progress weekend shows but is not done while Sunday is today', () => {
+    const days = [okDay(SAT), okDay(SUN)];
+    const sunday = d(SUN);
+    const { prog, done } = computeChallengeProgress(
+      weekend1,
+      days,
+      START,
+      sunday,
+    );
+    expect(prog).toBe(1);
+    expect(done).toBe(false);
+  });
+
+  it('Saturday alone does not make a weekend', () => {
+    const days = [okDay(SAT)];
+    const monday = d('2026-07-06');
+    expect(computeChallengeProgress(weekend1, days, START, monday).prog).toBe(
+      0,
+    );
+  });
+
+  it('a weekend day under the minimum score disqualifies the pair', () => {
+    // snack 1 → score 6.0 < 6.5
+    const days = [okDay(SAT), mkDay({ date: d(SUN), snack: 1 })];
+    const monday = d('2026-07-06');
+    expect(computeChallengeProgress(weekend1, days, START, monday).prog).toBe(
+      0,
+    );
+  });
+
+  it('windowed variant needs the weekends to fit the window', () => {
+    const weekend3 = def('weekend-3-mois'); // 3 week-ends / 30 jours
+    const within = [
+      '2026-07-04',
+      '2026-07-05',
+      '2026-07-11',
+      '2026-07-12',
+      '2026-07-18',
+      '2026-07-19',
+    ].map(okDay);
+    const after = d('2026-07-20');
+    const res = computeChallengeProgress(weekend3, within, START, after);
+    expect(res.prog).toBe(3);
+    expect(res.done).toBe(true);
+
+    // 3 week-ends étalés sur bien plus de 30 jours → pas validé
+    const spread = [
+      '2026-07-04',
+      '2026-07-05',
+      '2026-08-15',
+      '2026-08-16',
+      '2026-09-26',
+      '2026-09-27',
+    ].map(okDay);
+    const late = d('2026-09-28');
+    expect(computeChallengeProgress(weekend3, spread, START, late).done).toBe(
+      false,
+    );
+  });
+});
+
 describe('leftLabel', () => {
   it('pluralizes days and sessions', () => {
     expect(leftLabel(def('saisie-7'), 5)).toBe('Encore 2 jours');
     expect(leftLabel(def('saisie-7'), 6)).toBe('Encore 1 jour');
     expect(leftLabel(def('sport-3-semaine'), 1)).toBe('Encore 2 séances');
     expect(leftLabel(def('sport-3-semaine'), 2)).toBe('Encore 1 séance');
+    expect(leftLabel(def('weekend-3-mois'), 1)).toBe('Encore 2 week-ends');
+    expect(leftLabel(def('soir-leger-5'), 4)).toBe('Encore 1 soir');
   });
 });
