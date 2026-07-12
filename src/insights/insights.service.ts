@@ -102,12 +102,22 @@ export class InsightsService {
 
   async getBadges(userId: number): Promise<BadgeDto[]> {
     const days = await this.loadDays(userId);
-    return BADGES.map((b) => ({
-      id: b.id,
-      title: b.title,
-      emoji: b.emoji,
-      unlocked: b.unlock(days),
-    }));
+    return BADGES.map((b) => {
+      const unlocked = b.unlock(days);
+      return {
+        id: b.id,
+        title: b.title,
+        emoji: b.emoji,
+        unlocked,
+        description: b.description,
+        prog: b.progress(days),
+        total: b.total,
+        // Calculée seulement quand c'est utile — un badge verrouillé n'a pas de date.
+        unlockedAt: unlocked
+          ? (b.unlockedAt(days)?.toISOString() ?? null)
+          : null,
+      };
+    });
   }
 
   async getStats(userId: number, monthParam?: string): Promise<StatsDto> {
