@@ -1,9 +1,29 @@
-import { Controller, Post, Body, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UnauthorizedException,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
+import { Request } from 'express';
 import { AuthService } from './auth.service';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateUserDto } from '../users/dto/create-user.dto';
+import { JwtAuthGuard } from './jwt-auth.guard';
+
+interface AuthedRequest extends Request {
+  user: { id: number; email: string };
+}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -41,5 +61,23 @@ export class AuthController {
   async register(@Body() createUserDto: CreateUserDto) {
     const user = await this.authService.register(createUserDto);
     return this.authService.login(user);
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Changer son mot de passe' })
+  @ApiResponse({ status: 201, description: 'Mot de passe changé' })
+  @ApiResponse({ status: 401, description: 'Mot de passe actuel incorrect' })
+  @ApiBody({ type: ChangePasswordDto })
+  async changePassword(
+    @Req() req: AuthedRequest,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(
+      req.user.email,
+      dto.currentPassword,
+      dto.newPassword,
+    );
   }
 }

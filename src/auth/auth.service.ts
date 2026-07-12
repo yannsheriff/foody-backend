@@ -1,4 +1,8 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
@@ -27,6 +31,18 @@ export class AuthService {
       access_token: this.jwtService.sign(payload),
       user,
     };
+  }
+
+  /// Change le mot de passe après avoir vérifié l'actuel (bcrypt). 401 si
+  /// l'ancien ne correspond pas.
+  async changePassword(email: string, current: string, next: string) {
+    const user = await this.usersService.findByEmail(email);
+    const ok = await bcrypt.compare(current, user.password);
+    if (!ok) {
+      throw new UnauthorizedException('Mot de passe actuel incorrect');
+    }
+    await this.usersService.update(user.id, { password: next });
+    return { ok: true };
   }
 
   async register(createUserDto: CreateUserDto) {
