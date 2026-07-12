@@ -13,6 +13,7 @@ import { StreakDto } from './dto/streak.dto';
 import { RecordsDto } from './dto/records.dto';
 import { BadgeDto } from './dto/badge.dto';
 import { StatsDto } from './dto/stats.dto';
+import { OverviewDto } from './dto/overview.dto';
 
 interface AuthedRequest extends Request {
   user: { id: number };
@@ -50,9 +51,22 @@ export class InsightsController {
     return this.insights.getBadges(req.user.id);
   }
 
+  @Get('overview')
+  @ApiOperation({
+    summary:
+      'Vue d’ensemble glissante : 30 derniers jours (+ deltas vs les 30 précédents), 8 semaines glissantes, jour fort/faible',
+  })
+  @ApiResponse({ status: 200, type: OverviewDto })
+  getOverview(@Req() req: AuthedRequest): Promise<OverviewDto> {
+    return this.insights.getOverview(req.user.id);
+  }
+
   @Get('stats')
   @ApiOperation({
     summary: 'Stats mensuelles : moyenne, répartition, tendance',
+    deprecated: true,
+    description:
+      'Conservé pour les anciens clients — les fronts utilisent GET /me/overview (glissant) depuis 07/2026.',
   })
   @ApiQuery({ name: 'month', required: false, example: '2026-05' })
   @ApiResponse({ status: 200, type: StatsDto })

@@ -14,6 +14,7 @@ import { StreakDto } from './dto/streak.dto';
 import { RecordsDto } from './dto/records.dto';
 import { BadgeDto } from './dto/badge.dto';
 import { StatsDto } from './dto/stats.dto';
+import { OverviewDto } from './dto/overview.dto';
 
 @Injectable()
 export class InsightsService {
@@ -118,6 +119,140 @@ export class InsightsService {
           : null,
       };
     });
+  }
+
+  /**
+   * Vue d'ensemble glissante : 30 derniers jours (+ les 30 d'avant pour les
+   * deltas), 8 semaines calendaires glissantes (lundi UTC), jour de semaine
+   * fort/faible. Remplace la lecture mensuelle de getStats côté produit —
+   * une fenêtre calendaire perd son historique à chaque 1er du mois.
+   * Les fenêtres sont refiltrées en code : le SQL n'est qu'un préfiltre.
+   */
+  async getOverview(userId: number): Promise<OverviewDto> {
+    const today = startOfDay(new Date());
+    const tomorrow = new Date(today.getTime() + 86_400_000);
+    const currentMonday = this.mondayOf(today);
+    const chartStart = new Date(currentMonday.getTime() - 7 * 7 * 86_400_000);
+    const windowStart = new Date(today.getTime() - 29 * 86_400_000);
+    const prevStart = new Date(today.getTime() - 59 * 86_400_000);
+    const loadStart = new Date(
+      Math.min(chartStart.getTime(), prevStart.getTime()),
+    );
+    const all = await this.loadDays(userId, { gte: loadStart, lt: tomorrow });
+
+    const between = (gte: Date, lt: Date) =>
+      all.filter((d) => {
+        const t = startOfDay(new Date(d.date)).getTime();
+        return t >= gte.getTime() && t < lt.getTime();
+      });
+
+    const windowDays = between(windowStart, tomorrow);
+    const previousDays = between(prevStart, windowStart);
+
+    // 8 semaines glissantes, la courante (partielle) en dernier
+    const weeks = Array.from({ length: 8 }, (_, i) => {
+      const start = new Date(chartStart.getTime() + i * 7 * 86_400_000);
+      const end = new Date(start.getTime() + 7 * 86_400_000);
+      const tracked = between(start, end).filter(isDayFullyTracked);
+      return {
+        start: ymd(start),
+        score: tracked.length ? this.roundedAverage(tracked) : null,
+        days: tracked.length,
+      };
+    });
+
+    // Jour de semaine fort/faible — min 3 occurrences, écart ≥ 0,8 (même
+    // seuil que l'ancien insight week-end, qu'il généralise).
+    const byWeekday = new Map<number, Days[]>();
+    for (const d of all.filter(isDayFullyTracked)) {
+      const w = new Date(d.date).getUTCDay();
+      byWeekday.set(w, [...(byWeekday.get(w) ?? []), d]);
+    }
+    const eligible = [...byWeekday.entries()]
+      .filter(([, days]) => days.length >= 3)
+      .map(([weekday, days]) => ({
+        weekday,
+        average: this.roundedAverage(days),
+      }));
+    let bestDay = null;
+    let worstDay = null;
+    if (eligible.length >= 2) {
+      const sorted = [...eligible].sort((a, b) => b.average - a.average);
+      if (sorted[0].average - sorted[sorted.length - 1].average >= 0.8) {
+        bestDay = sorted[0];
+        worstDay = sorted[sorted.length - 1];
+      }
+    }
+
+    return {
+      window: this.windowSummary(windowDays),
+      previous: this.windowSummary(previousDays),
+      repartition: this.mealRepartition(windowDays),
+      weeks,
+      bestDay,
+      worstDay,
+    };
+  }
+
+  private windowSummary(days: Days[]) {
+    const tracked = days.filter(isDayFullyTracked);
+    return {
+      average: tracked.length ? this.roundedAverage(tracked) : 0,
+      optimalDays: tracked.filter((d) => computeDayScore(d) >= 8).length,
+      daysTracked: tracked.length,
+    };
+  }
+
+  private roundedAverage(days: Days[]): number {
+    return (
+      Math.round(
+        (days.reduce((s, d) => s + computeDayScore(d), 0) / days.length) * 10,
+      ) / 10
+    );
+  }
+
+  private mealRepartition(days: Days[]): Record<string, number> {
+    const repartition = {
+      'tres-leger': 0,
+      leger: 0,
+      normal: 0,
+      copieux: 0,
+      'tres-copieux': 0,
+    };
+    const keyFor: Record<string, keyof typeof repartition> = {
+      tresLeger: 'tres-leger',
+      leger: 'leger',
+      normal: 'normal',
+      copieux: 'copieux',
+      tresCopieux: 'tres-copieux',
+    };
+    let total = 0;
+    for (const d of days) {
+      for (const slot of [
+        d.morning_score,
+        d.afternoon_score,
+        d.evening_score,
+      ]) {
+        if (slot) {
+          repartition[keyFor[slot]]++;
+          total++;
+        }
+      }
+    }
+    if (total > 0) {
+      (Object.keys(repartition) as (keyof typeof repartition)[]).forEach(
+        (k) => {
+          repartition[k] = Math.round((repartition[k] / total) * 100);
+        },
+      );
+    }
+    return repartition;
+  }
+
+  /** Lundi (UTC) de la semaine du jour donné. */
+  private mondayOf(day: Date): Date {
+    const offset = (day.getUTCDay() + 6) % 7;
+    return new Date(day.getTime() - offset * 86_400_000);
   }
 
   async getStats(userId: number, monthParam?: string): Promise<StatsDto> {

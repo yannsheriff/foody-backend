@@ -118,3 +118,76 @@ describe('InsightsService.getRecords / getStats', () => {
     expect(records.streakRecord).toBe(1);
   });
 });
+
+describe('InsightsService.getOverview', () => {
+  it('sépare la fenêtre 30 j et les 30 jours précédents', async () => {
+    // 5 jours récents parfaits (légers, sport) vs 5 anciens copieux
+    const recent = [0, 1, 2, 3, 4].map((o) =>
+      mkDay({ date: dayAt(o), snack: 0, sport_level: 'normal' }),
+    );
+    const older = [35, 36, 37, 38, 39].map((o) =>
+      mkDay({
+        date: dayAt(o),
+        morning_score: 'copieux',
+        afternoon_score: 'copieux',
+        evening_score: 'copieux',
+        snack: 1,
+      }),
+    );
+    const o = await mkService([...recent, ...older]).getOverview(1);
+    expect(o.window.daysTracked).toBe(5);
+    expect(o.previous.daysTracked).toBe(5);
+    expect(o.window.average).toBeGreaterThan(o.previous.average);
+  });
+
+  it('renvoie toujours 8 semaines, la courante en dernier, trous à null', async () => {
+    const o = await mkService([mkDay({ date: dayAt(0) })]).getOverview(1);
+    expect(o.weeks).toHaveLength(8);
+    const last = o.weeks[o.weeks.length - 1];
+    expect(last.score).not.toBeNull();
+    expect(o.weeks[0].score).toBeNull();
+    // les lundis se suivent de 7 jours
+    const starts = o.weeks.map((w) =>
+      new Date(w.start + 'T00:00:00Z').getTime(),
+    );
+    for (let i = 1; i < starts.length; i++) {
+      expect(starts[i] - starts[i - 1]).toBe(7 * 86_400_000);
+    }
+  });
+
+  it('jour fort/faible : min 3 occurrences et écart ≥ 0,8, sinon null', async () => {
+    // 3 lundis légers, 3 mardis copieux — écart net
+    const monday = new Date(
+      today.getTime() - ((today.getUTCDay() + 6) % 7) * 86_400_000,
+    );
+    const mk = (base: Date, weeksBack: number, over: Partial<Days>) =>
+      mkDay({
+        date: new Date(base.getTime() - weeksBack * 7 * 86_400_000),
+        ...over,
+      });
+    const tuesday = new Date(monday.getTime() + 86_400_000);
+    const light = { snack: 0 } as Partial<Days>;
+    const heavy = {
+      morning_score: 'copieux',
+      afternoon_score: 'copieux',
+      evening_score: 'copieux',
+      snack: 1,
+    } as Partial<Days>;
+    const days = [
+      mk(monday, 1, light),
+      mk(monday, 2, light),
+      mk(monday, 3, light),
+      mk(tuesday, 1, heavy),
+      mk(tuesday, 2, heavy),
+      mk(tuesday, 3, heavy),
+    ];
+    const o = await mkService(days).getOverview(1);
+    expect(o.bestDay?.weekday).toBe(1); // lundi UTC
+    expect(o.worstDay?.weekday).toBe(2); // mardi UTC
+    // 2 occurrences seulement → pas d'insight
+    const few = [mk(monday, 1, light), mk(tuesday, 1, heavy)];
+    const o2 = await mkService(few).getOverview(1);
+    expect(o2.bestDay).toBeNull();
+    expect(o2.worstDay).toBeNull();
+  });
+});
