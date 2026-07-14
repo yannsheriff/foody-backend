@@ -83,7 +83,11 @@ export class AuthService {
 
     let user = await this.usersService.findByAppleSub(sub);
     if (!user && normalized) {
-      const byEmail = await this.usersService.findByEmail(normalized);
+      // findByEmail JETTE un 404 quand l'email est inconnu — ici c'est le cas
+      // nominal (email en relais privé Apple, jamais vu) : on absorbe, on créera.
+      const byEmail = await this.usersService
+        .findByEmail(normalized)
+        .catch(() => null);
       if (byEmail) {
         user = await this.usersService.linkAppleSub(byEmail.id, sub);
       }

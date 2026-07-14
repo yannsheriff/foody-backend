@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 // appleLogin — la vérification du jeton est remplacée, on teste la logique
@@ -70,6 +70,9 @@ describe('AuthService.appleLogin', () => {
     const created = { id: 9, email: 'new@relay.appleid.com', name: 'Camille' };
     const linked = { ...created, password: 'hash', apple_sub: 'sub-3' };
     const { service, usersService } = mkService({
+      // Fidèle au vrai UsersService : findByEmail JETTE un 404 si inconnu
+      // (régression du 14/07 — email en relais privé Apple).
+      findByEmail: jest.fn().mockRejectedValue(new NotFoundException()),
       create: jest.fn().mockResolvedValue(created),
       linkAppleSub: jest.fn().mockResolvedValue(linked),
     });
