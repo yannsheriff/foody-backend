@@ -25,6 +25,17 @@ export class UsersService {
     return this.excludePassword(user);
   }
 
+  async findByAppleSub(sub: string) {
+    return this.prisma.user.findUnique({ where: { apple_sub: sub } });
+  }
+
+  async linkAppleSub(id: number, sub: string) {
+    return this.prisma.user.update({
+      where: { id },
+      data: { apple_sub: sub },
+    });
+  }
+
   async findOne(id: number) {
     const user = await this.prisma.user.findUnique({
       where: { id },

@@ -20,6 +20,8 @@ model User {
   email         String             @unique
   name          String
   password      String
+  // Identifiant stable « Sign in with Apple » (claim sub) — null si compte email.
+  apple_sub     String?            @unique
   days          Days[]
   challenges    UserChallenge[]
   subscriptions PushSubscription[]

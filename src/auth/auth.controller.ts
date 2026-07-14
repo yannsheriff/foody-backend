@@ -18,6 +18,7 @@ import {
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { AppleLoginDto } from './dto/apple-login.dto';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
@@ -48,6 +49,19 @@ export class AuthController {
       throw new UnauthorizedException();
     }
     return this.authService.login(user);
+  }
+
+  @Post('apple')
+  @ApiOperation({
+    summary: 'Connexion / inscription via Sign in with Apple',
+    description:
+      "Vérifie l'identity token auprès des clés publiques d'Apple (issuer + audience bundle iOS). Retrouve le compte par apple_sub, lie un compte email existant, ou crée le compte.",
+  })
+  @ApiResponse({ status: 201, description: 'Connecté', type: LoginResponseDto })
+  @ApiResponse({ status: 401, description: 'Jeton Apple invalide' })
+  @ApiBody({ type: AppleLoginDto })
+  async apple(@Body() dto: AppleLoginDto) {
+    return this.authService.appleLogin(dto.identity_token, dto.name);
   }
 
   @Post('register')
