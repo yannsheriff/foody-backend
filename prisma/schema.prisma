@@ -24,6 +24,8 @@ model User {
   apple_sub     String?            @unique
   days          Days[]
   challenges    UserChallenge[]
+  weekly        WeeklyChallenge[]
+  badges        UserBadge[]
   subscriptions PushSubscription[]
 
   @@map("users")
@@ -63,6 +65,14 @@ enum SportLevel {
   intense
 }
 
+// Weekly challenge lifecycle. Single-word lowercase values on purpose: Prisma
+// identifier = DB string = wire string, no mapper (like ChallengeStatus).
+enum WeeklyChallengeStatus {
+  active
+  won
+  lost
+}
+
 model UserChallenge {
   id           Int             @id @default(autoincrement())
   user_id      Int
@@ -77,23 +87,64 @@ model UserChallenge {
   @@map("user_challenges")
 }
 
+// The challenge a user picked for a given ISO week (one per user per week).
+// Offers themselves are deterministic in code (not stored). `target` is frozen
+// at selection (prorated when the user picks mid-week). Resolution is lazy at
+// read time: an elapsed `active` row flips to `won`/`lost` and is then frozen.
+model WeeklyChallenge {
+  id            Int                   @id @default(autoincrement())
+  user_id       Int
+  iso_week      String // "2026-W30" (ISO-8601 week key)
+  week_start    DateTime // Monday 00:00 UTC
+  week_end      DateTime // Sunday 23:59:59.999 UTC
+  // Catalog id from weekly-catalog.constants.ts — persisted, never rename.
+  challenge_id  String
+  flavor        String // 'accessible' | 'ambitious'
+  target        Int // frozen at selection (prorated)
+  status        WeeklyChallengeStatus @default(active)
+  started_at    DateTime              @default(now())
+  resolved_at   DateTime?
+  reward_points Int? // snapshot (5 | 10) credited at resolution
+  user          User                  @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, iso_week]) // one chosen challenge per user per week
+  @@index([user_id])
+  @@map("weekly_challenges")
+}
+
+// Every unlocked badge — monthly (badge_id 'season-YYYY-MM') AND legacy
+// achievements (badge_id = the spec id). Persisted because monthly points reset
+// each month; achievements are backfilled lazily from day history on first read
+// so no existing user loses a badge. Once written, a badge is frozen.
+model UserBadge {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  badge_id    String
+  unlocked_at DateTime @default(now())
+  user        User     @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, badge_id])
+  @@index([user_id])
+  @@map("user_badges")
+}
+
 model Days {
-  id              Int      @id @default(autoincrement())
-  user_id         Int
-  morning_score   Score?
-  afternoon_score Score?
-  evening_score   Score?
-  snack           Float?
+  id                 Int         @id @default(autoincrement())
+  user_id            Int
+  morning_score      Score?
+  afternoon_score    Score?
+  evening_score      Score?
+  snack              Float?
   // Legacy mirror kept in sync on write (true when sport_level is normal/intense)
   // for backward compatibility; sport_level is the source of truth for reads.
-  sport           Boolean     @default(false)
-  sport_level     SportLevel?
-  sport_type      String?
-  date            DateTime @default(now())
+  sport              Boolean     @default(false)
+  sport_level        SportLevel?
+  sport_type         String?
+  date               DateTime    @default(now())
   // Set server-side the first time all 3 meals are filled; never overwritten.
   // NULL = pre-feature row, treated as on-time for the streak (grandfathered).
   meals_completed_at DateTime?
-  user            User     @relation(fields: [user_id], references: [id])
+  user               User        @relation(fields: [user_id], references: [id])
 
   @@index([user_id])
   @@map("days")

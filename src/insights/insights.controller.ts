@@ -11,7 +11,6 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { InsightsService } from './insights.service';
 import { StreakDto } from './dto/streak.dto';
 import { RecordsDto } from './dto/records.dto';
-import { BadgeDto } from './dto/badge.dto';
 import { StatsDto } from './dto/stats.dto';
 import { OverviewDto } from './dto/overview.dto';
 
@@ -40,15 +39,6 @@ export class InsightsController {
   @ApiResponse({ status: 200, type: RecordsDto })
   getRecords(@Req() req: AuthedRequest): Promise<RecordsDto> {
     return this.insights.getRecords(req.user.id);
-  }
-
-  @Get('badges')
-  @ApiOperation({
-    summary: 'Catalogue de badges avec statut débloqué/non débloqué',
-  })
-  @ApiResponse({ status: 200, type: [BadgeDto] })
-  getBadges(@Req() req: AuthedRequest): Promise<BadgeDto[]> {
-    return this.insights.getBadges(req.user.id);
   }
 
   @Get('overview')

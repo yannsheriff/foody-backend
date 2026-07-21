@@ -6,7 +6,7 @@ import { DaysModule } from './days/days.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { InsightsModule } from './insights/insights.module';
-import { ChallengesModule } from './challenges/challenges.module';
+import { RewardsModule } from './rewards/rewards.module';
 import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
@@ -16,7 +16,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     UsersModule,
     AuthModule,
     InsightsModule,
-    ChallengesModule,
+    RewardsModule,
     NotificationsModule,
   ],
   controllers: [AppController],

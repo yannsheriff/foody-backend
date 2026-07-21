@@ -9,10 +9,8 @@ import {
   startOfDay,
   ymd,
 } from './insights.scoring';
-import { BADGES } from './insights.constants';
 import { StreakDto } from './dto/streak.dto';
 import { RecordsDto } from './dto/records.dto';
-import { BadgeDto } from './dto/badge.dto';
 import { StatsDto } from './dto/stats.dto';
 import { OverviewDto } from './dto/overview.dto';
 
@@ -99,26 +97,6 @@ export class InsightsService {
       ),
       monthAverage,
     };
-  }
-
-  async getBadges(userId: number): Promise<BadgeDto[]> {
-    const days = await this.loadDays(userId);
-    return BADGES.map((b) => {
-      const unlocked = b.unlock(days);
-      return {
-        id: b.id,
-        title: b.title,
-        emoji: b.emoji,
-        unlocked,
-        description: b.description,
-        prog: b.progress(days),
-        total: b.total,
-        // Calculée seulement quand c'est utile — un badge verrouillé n'a pas de date.
-        unlockedAt: unlocked
-          ? (b.unlockedAt(days)?.toISOString() ?? null)
-          : null,
-      };
-    });
   }
 
   /**
