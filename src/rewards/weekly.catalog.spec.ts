@@ -42,6 +42,16 @@ function qualifyingDay(def: WeeklyChallengeDef, date: Date): Days {
     case 'soir-leger':
       d.evening_score = 'leger';
       break;
+    case 'parfait':
+    case 'combo':
+      // parfait : base (leger/normal/leger, snack 0) + sport ; combo : sport + dîner léger (base)
+      d.sport_level = 'intense';
+      break;
+    case 'volume':
+      d.morning_score = 'leger';
+      d.afternoon_score = 'leger';
+      d.evening_score = 'leger';
+      break;
     // saisie / copieux / grignotage / weekend qualify with the base day
   }
   return d;

@@ -142,3 +142,27 @@ describe('qualifiesWeekly · note threshold', () => {
     expect(qualifiesWeekly(def('w-note-8-3'), light)).toBe(true);
   });
 });
+
+describe('nouvelles mécaniques', () => {
+  it('parfait : 3 repas sans copieux + sport + zéro grignotage', () => {
+    // base mkDay = leger/normal/leger, snack 0 → il ne manque que le sport
+    expect(qualifiesWeekly(def('w-parfait-1'), mkDay({ date: weekDay(0), sport_level: 'intense' }))).toBe(true);
+    expect(qualifiesWeekly(def('w-parfait-1'), mkDay({ date: weekDay(0), sport_level: null }))).toBe(false);
+    expect(qualifiesWeekly(def('w-parfait-1'), mkDay({ date: weekDay(0), sport_level: 'intense', evening_score: 'copieux' }))).toBe(false);
+    expect(qualifiesWeekly(def('w-parfait-1'), mkDay({ date: weekDay(0), sport_level: 'intense', snack: 0.5 }))).toBe(false);
+  });
+
+  it('combo : sport ET dîner léger le même jour', () => {
+    expect(qualifiesWeekly(def('w-combo-2'), mkDay({ date: weekDay(0), sport_level: 'normal', evening_score: 'leger' }))).toBe(true);
+    expect(qualifiesWeekly(def('w-combo-2'), mkDay({ date: weekDay(0), sport_level: null, evening_score: 'leger' }))).toBe(false);
+    expect(qualifiesWeekly(def('w-combo-2'), mkDay({ date: weekDay(0), sport_level: 'normal', evening_score: 'copieux' }))).toBe(false);
+  });
+
+  it('volume : compte les repas légers, pas les jours', () => {
+    const days = [
+      mkDay({ date: weekDay(0), morning_score: 'leger', afternoon_score: 'leger', evening_score: 'leger' }), // 3 légers
+      mkDay({ date: weekDay(1), morning_score: 'leger', afternoon_score: 'normal', evening_score: 'copieux' }), // 1 léger
+    ];
+    expect(countQualifyingDays(def('w-volume-5'), days, WEEK.weekStart, WEEK.weekEnd, WEEK.weekEnd)).toBe(4);
+  });
+});

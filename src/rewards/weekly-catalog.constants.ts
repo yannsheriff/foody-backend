@@ -11,7 +11,10 @@ export type WeeklyKind =
   | 'copieux'
   | 'sport'
   | 'note'
-  | 'weekend';
+  | 'weekend'
+  | 'parfait' // journée « sans fausse note » : léger + sport + zéro grignotage
+  | 'combo' // sport ET dîner léger le même jour
+  | 'volume'; // compte des repas légers (pas des jours)
 
 export interface WeeklyChallengeDef {
   // Persisted in weekly_challenges.challenge_id — never rename, only add.
@@ -22,10 +25,14 @@ export interface WeeklyChallengeDef {
   kindLabel: string;
   // Difficulty on the ELO scale (~1000 easy … ~1900 hard).
   rating: number;
-  // Qualifying days needed within the week (weekend: 1 clean weekend).
+  // Qualifying days needed within the week (weekend: 1 clean weekend ·
+  // volume: number of qualifying MEALS, not days).
   total: number;
   // note: minimum per-day score · weekend: minimum score of each weekend day.
   minScore?: number;
+  // Critères explicités à l'utilisateur, affichés sous le titre (surtout pour
+  // les mécaniques combo comme « journée sans fausse note »).
+  description?: string;
 }
 
 const KIND_LABELS: Record<WeeklyKind, string> = {
@@ -36,6 +43,9 @@ const KIND_LABELS: Record<WeeklyKind, string> = {
   sport: 'Sport',
   note: 'Note',
   weekend: 'Week-end',
+  parfait: 'Journée parfaite',
+  combo: 'Combo',
+  volume: 'Volume',
 };
 
 export function kindLabel(kind: WeeklyKind): string {
@@ -215,16 +225,70 @@ export const WEEKLY_CATALOG: WeeklyChallengeDef[] = [
     total: 5,
     minScore: 8,
   },
-  // ─── Note · un pic (journée parfaite) ──────────────────────
+  // ─── Journée parfaite (combo : léger + sport + zéro grignotage) ──
   {
-    id: 'w-parfait-9',
+    id: 'w-parfait-1',
     emoji: '✨',
-    title: 'Une journée à 9+ cette semaine',
-    kind: 'note',
-    kindLabel: KIND_LABELS.note,
-    rating: 1450,
+    title: 'Une journée sans fausse note',
+    kind: 'parfait',
+    kindLabel: KIND_LABELS.parfait,
+    description:
+      'Une journée qui coche tout : tes 3 repas sans excès (aucun copieux), du sport, et le grignotage au minimum.',
+    rating: 1350,
     total: 1,
-    minScore: 9,
+  },
+  {
+    id: 'w-parfait-3',
+    emoji: '✨',
+    title: 'Trois journées parfaites',
+    kind: 'parfait',
+    kindLabel: KIND_LABELS.parfait,
+    description:
+      'Trois journées qui cochent tout : repas sans excès, sport, grignotage au minimum. Chacune, un sans-faute.',
+    rating: 1800,
+    total: 3,
+  },
+  // ─── Combo effort (sport + dîner léger le même jour) ──────
+  {
+    id: 'w-combo-2',
+    emoji: '🏃',
+    title: "Le corps et l'assiette, 2 fois",
+    kind: 'combo',
+    kindLabel: KIND_LABELS.combo,
+    description: 'Du sport ET un dîner léger le même jour — 2 jours cette semaine.',
+    rating: 1400,
+    total: 2,
+  },
+  {
+    id: 'w-combo-3',
+    emoji: '🏃',
+    title: "Le corps et l'assiette, 3 fois",
+    kind: 'combo',
+    kindLabel: KIND_LABELS.combo,
+    description: 'Du sport ET un dîner léger le même jour — 3 jours cette semaine.',
+    rating: 1650,
+    total: 3,
+  },
+  // ─── Volume (repas légers, peu importe les jours) ─────────
+  {
+    id: 'w-volume-5',
+    emoji: '🥗',
+    title: '5 repas légers cette semaine',
+    kind: 'volume',
+    kindLabel: KIND_LABELS.volume,
+    description: 'Des repas légers ou très légers — 5 en tout, peu importe la répartition.',
+    rating: 1150,
+    total: 5,
+  },
+  {
+    id: 'w-volume-10',
+    emoji: '🥗',
+    title: '10 repas légers cette semaine',
+    kind: 'volume',
+    kindLabel: KIND_LABELS.volume,
+    description: 'Des repas légers ou très légers — 10 en tout, peu importe la répartition.',
+    rating: 1500,
+    total: 10,
   },
   // ─── Week-end · un week-end propre (non prorable) ──────────
   {

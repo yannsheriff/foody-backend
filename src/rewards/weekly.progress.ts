@@ -1,4 +1,4 @@
-import { Days } from '@prisma/client';
+import { Days, Score } from '@prisma/client';
 import {
   computeDayScore,
   hasHeavyMeal,
@@ -66,6 +66,31 @@ export function proratedTarget(baseTarget: number, daysLeft: number): number {
   return Math.max(1, Math.round((baseTarget * daysLeft) / 7));
 }
 
+const LIGHT_MEALS: Score[] = ['tresLeger', 'leger'];
+function isLightMeal(s: Score | null): boolean {
+  return s != null && LIGHT_MEALS.includes(s);
+}
+// Nombre de repas légers/très légers d'une journée (pour le kind `volume`).
+export function lightMealCount(d: Days): number {
+  return (
+    (isLightMeal(d.morning_score) ? 1 : 0) +
+    (isLightMeal(d.afternoon_score) ? 1 : 0) +
+    (isLightMeal(d.evening_score) ? 1 : 0)
+  );
+}
+
+// Une journée « parfaite / sans fausse note » : 3 repas saisis, aucun copieux,
+// du sport, et le grignotage au minimum.
+export function isPerfectDay(d: Days): boolean {
+  return (
+    isDayFullyTracked(d) &&
+    !hasHeavyMeal(d) &&
+    (d.sport_level === 'normal' || d.sport_level === 'intense') &&
+    d.snack != null &&
+    d.snack < SNACK_THRESHOLD
+  );
+}
+
 // Does a single day satisfy the challenge's metric?
 export function qualifiesWeekly(def: WeeklyChallengeDef, d: Days): boolean {
   switch (def.kind) {
@@ -86,6 +111,17 @@ export function qualifiesWeekly(def: WeeklyChallengeDef, d: Days): boolean {
         isDayFullyTracked(d) &&
         computeDayScore(d) >= (def.minScore ?? WEEKEND_MIN_SCORE)
       );
+    case 'parfait':
+      return isPerfectDay(d);
+    case 'combo':
+      return (
+        (d.sport_level === 'normal' || d.sport_level === 'intense') &&
+        (d.evening_score === 'tresLeger' || d.evening_score === 'leger')
+      );
+    case 'volume':
+      // Un jour « qualifie » s'il a au moins un repas léger ; le vrai compte
+      // (nombre de repas) se fait dans countQualifyingDays.
+      return lightMealCount(d) > 0;
   }
 }
 
@@ -124,6 +160,19 @@ export function countQualifyingDays(
 
   if (def.kind === 'weekend') {
     return cleanWeekendProgress(def, days, weekStart, endKey);
+  }
+
+  if (def.kind === 'volume') {
+    // Compte les repas légers sur les jours distincts de la fenêtre (pas les jours).
+    let meals = 0;
+    const seenDays = new Set<string>();
+    for (const d of days) {
+      const key = ymd(new Date(d.date));
+      if (key < startKey || key > endKey || seenDays.has(key)) continue;
+      seenDays.add(key);
+      meals += lightMealCount(d);
+    }
+    return meals;
   }
 
   const qualifyingDays = new Set<string>();

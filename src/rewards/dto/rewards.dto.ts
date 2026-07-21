@@ -13,6 +13,8 @@ export class ActiveWeeklyDto {
   @ApiProperty({ example: 'w-soir-3' }) id!: string;
   @ApiProperty({ example: '🌙' }) emoji!: string;
   @ApiProperty({ example: '3 dîners légers cette semaine' }) title!: string;
+  @ApiProperty({ required: false, nullable: true, description: 'Critères explicités (affichés sous le titre)' })
+  description?: string | null;
   @ApiProperty({ description: 'Libellé de famille', example: 'Dîner' }) kind!: string;
   @ApiProperty({ description: 'Id technique de famille', example: 'soir-leger' })
   kindId!: string;
@@ -30,6 +32,8 @@ export class WeeklyOfferDto {
   @ApiProperty({ example: 'w-soir-3' }) id!: string;
   @ApiProperty({ example: '🌙' }) emoji!: string;
   @ApiProperty({ example: '3 dîners légers cette semaine' }) title!: string;
+  @ApiProperty({ required: false, nullable: true, description: 'Critères explicités (affichés sous le titre)' })
+  description?: string | null;
   @ApiProperty({ example: 'Dîner' }) kind!: string;
   @ApiProperty({ example: 'soir-leger' }) kindId!: string;
   @ApiProperty({ enum: ['accessible', 'ambitious'], example: 'accessible' })
