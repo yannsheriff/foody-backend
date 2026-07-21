@@ -31,22 +31,31 @@ function mkService(
     consumptions?: unknown[];
   } = {},
 ) {
-  let id = 1;
+  // Ledger dynamique : findMany reflète les créations (les débits d'achat
+  // impactent le solde relu par getWallet après un achat).
+  const store: Record<string, unknown>[] = [...((over.txns as Record<string, unknown>[]) ?? [])];
+  let id = store.length + 1;
   const prisma = {
     weeklyChallenge: { findMany: jest.fn().mockResolvedValue(over.weekly ?? []) },
     userBadge: { findMany: jest.fn().mockResolvedValue(over.badges ?? []) },
-    days: { findMany: jest.fn().mockResolvedValue(over.days ?? []) },
+    days: {
+      findMany: jest.fn().mockResolvedValue(over.days ?? []),
+      update: jest.fn().mockResolvedValue({}),
+    },
     freezeConsumption: {
       findMany: jest.fn().mockResolvedValue(over.consumptions ?? []),
     },
     coinTransaction: {
-      findMany: jest.fn().mockResolvedValue(over.txns ?? []),
-      create: jest
-        .fn()
-        .mockImplementation(({ data }) =>
-          Promise.resolve({ id: id++, created_at: new Date(), ...data }),
-        ),
+      findMany: jest.fn().mockImplementation(() => Promise.resolve([...store])),
+      create: jest.fn().mockImplementation(({ data }) => {
+        const row = { id: id++, created_at: new Date(), ...data };
+        store.push(row);
+        return Promise.resolve(row);
+      }),
     },
+    $transaction: jest
+      .fn()
+      .mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops)),
   };
   return { service: new EconomyService(prisma as never), prisma };
 }
@@ -107,5 +116,82 @@ describe('EconomyService.loadAndSync — crédits lazy', () => {
     });
     const state = await service.loadAndSync(1);
     expect(state.freezeStock).toBe(1); // 2 achats − 1 conso
+  });
+});
+
+const NOW = new Date(Date.UTC(2026, 6, 21, 12)); // 21 juil 2026
+function todayRow(over: Record<string, unknown> = {}) {
+  return {
+    id: 500,
+    user_id: 1,
+    morning_score: 'leger',
+    afternoon_score: 'normal',
+    evening_score: 'copieux',
+    snack: 0,
+    sport: false,
+    sport_level: null,
+    sport_type: null,
+    meals_completed_at: null,
+    cheat_slot: null,
+    date: NOW,
+    ...over,
+  };
+}
+const welcome100 = [{ id: 1, user_id: 1, amount: 100, reason: 'welcome', ref: 'welcome' }];
+
+describe('EconomyService — boutique', () => {
+  it('buyFreeze : refuse si solde insuffisant', async () => {
+    const { service } = mkService({
+      txns: [{ id: 1, user_id: 1, amount: 30, reason: 'welcome', ref: 'welcome' }],
+    });
+    await expect(service.buyFreeze(1)).rejects.toThrow('Solde insuffisant');
+  });
+
+  it('buyFreeze : refuse si un gel est déjà en réserve', async () => {
+    const { service } = mkService({
+      txns: [
+        { id: 1, user_id: 1, amount: 200, reason: 'welcome', ref: 'welcome' },
+        { id: 2, user_id: 1, amount: -70, reason: 'buy_freeze', ref: 'x' },
+      ],
+    });
+    await expect(service.buyFreeze(1)).rejects.toThrow('déjà un gel');
+  });
+
+  it('buyFreeze : débite 70 et renvoie le solde + stock à jour', async () => {
+    const { service, prisma } = mkService({ txns: welcome100 });
+    const wallet = await service.buyFreeze(1);
+    expect(prisma.coinTransaction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ reason: 'buy_freeze', amount: -70 }),
+      }),
+    );
+    expect(wallet.balance).toBe(30); // 100 − 70
+    expect(wallet.freezeStock).toBe(1);
+  });
+
+  it('buyCheatMeal : refuse si le repas n’est pas lourd', async () => {
+    const { service } = mkService({
+      days: [todayRow({ evening_score: 'leger' })],
+      txns: welcome100,
+    });
+    await expect(service.buyCheatMeal(1, 'evening', NOW)).rejects.toThrow(
+      "n'est pas lourd",
+    );
+  });
+
+  it('buyCheatMeal : débite 25, pose le cheat_slot, renvoie le solde', async () => {
+    const { service, prisma } = mkService({
+      days: [todayRow({ evening_score: 'copieux' })],
+      txns: welcome100,
+    });
+    const wallet = await service.buyCheatMeal(1, 'evening', NOW);
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.days.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 500 },
+        data: { cheat_slot: 'evening' },
+      }),
+    );
+    expect(wallet.balance).toBe(75); // 100 − 25
   });
 });

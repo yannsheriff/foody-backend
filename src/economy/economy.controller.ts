@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -9,6 +9,7 @@ import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EconomyService } from './economy.service';
 import { WalletDto } from './dto/wallet.dto';
+import { BuyCheatMealDto } from './dto/buy-cheat-meal.dto';
 
 interface AuthedRequest extends Request {
   user: { id: number };
@@ -26,5 +27,24 @@ export class EconomyController {
   @ApiResponse({ status: 200, type: WalletDto })
   getWallet(@Req() req: AuthedRequest): Promise<WalletDto> {
     return this.economy.getWallet(req.user.id);
+  }
+
+  @Post('shop/freeze')
+  @ApiOperation({ summary: 'Acheter un gel de flamme (70 🪙, max 1 en réserve)' })
+  @ApiResponse({ status: 201, type: WalletDto })
+  buyFreeze(@Req() req: AuthedRequest): Promise<WalletDto> {
+    return this.economy.buyFreeze(req.user.id);
+  }
+
+  @Post('shop/cheat-meal')
+  @ApiOperation({
+    summary: 'Acheter-et-appliquer un cheat meal sur un repas lourd du jour (25 🪙)',
+  })
+  @ApiResponse({ status: 201, type: WalletDto })
+  buyCheatMeal(
+    @Req() req: AuthedRequest,
+    @Body() body: BuyCheatMealDto,
+  ): Promise<WalletDto> {
+    return this.economy.buyCheatMeal(req.user.id, body.slot);
   }
 }

@@ -1,8 +1,21 @@
-import { Injectable } from '@nestjs/common';
-import { CoinTransaction, FreezeConsumption } from '@prisma/client';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
+import { CoinTransaction, Days, FreezeConsumption } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { computeRecordStreak } from '../insights/insights.scoring';
-import { COIN_GAINS, FLAME_MILESTONES } from './economy.constants';
+import {
+  computeRecordStreak,
+  startOfDay,
+  ymd,
+} from '../insights/insights.scoring';
+import {
+  COIN_GAINS,
+  FLAME_MILESTONES,
+  MAX_FREEZE_STOCK,
+  SHOP_PRICES,
+} from './economy.constants';
 import { computeBalance, freezeStock } from './wallet';
 import { WalletDto } from './dto/wallet.dto';
 
@@ -26,6 +39,86 @@ export class EconomyService {
   async getWallet(userId: number): Promise<WalletDto> {
     const state = await this.loadAndSync(userId);
     return { balance: state.balance, freezeStock: state.freezeStock };
+  }
+
+  // ─── Boutique (achats) ───────────────────────────────────────
+
+  /** Achète un gel de flamme (max 1 en réserve). Débite 70 🪙. */
+  async buyFreeze(userId: number): Promise<WalletDto> {
+    const state = await this.loadAndSync(userId);
+    if (state.freezeStock >= MAX_FREEZE_STOCK) {
+      throw new ConflictException('Tu as déjà un gel en réserve');
+    }
+    if (state.balance < SHOP_PRICES.freeze) {
+      throw new BadRequestException('Solde insuffisant');
+    }
+    await this.prisma.coinTransaction.create({
+      data: {
+        user_id: userId,
+        amount: -SHOP_PRICES.freeze,
+        reason: 'buy_freeze',
+        ref: new Date().toISOString(), // un achat = une ligne unique
+      },
+    });
+    return this.getWallet(userId);
+  }
+
+  /**
+   * Achète-et-applique un cheat meal sur la journée EN COURS, sur le créneau
+   * choisi (qui doit être un repas lourd non encore réparé). Débite 25 🪙 et
+   * pose Days.cheat_slot (le scoring le compte alors comme un « normal »).
+   */
+  async buyCheatMeal(
+    userId: number,
+    slot: 'morning' | 'afternoon' | 'evening',
+    now: Date = new Date(),
+  ): Promise<WalletDto> {
+    const todayKey = ymd(startOfDay(now));
+    const days = await this.prisma.days.findMany({ where: { user_id: userId } });
+    const today = days.find((d) => ymd(new Date(d.date)) === todayKey);
+    if (!today) {
+      throw new BadRequestException("Aucune journée à réparer aujourd'hui");
+    }
+    if (today.cheat_slot) {
+      throw new BadRequestException('Un repas est déjà réparé aujourd’hui');
+    }
+    const score = this.slotScore(today, slot);
+    if (score !== 'copieux' && score !== 'tresCopieux') {
+      throw new BadRequestException("Ce repas n'est pas lourd");
+    }
+    const state = await this.loadAndSync(userId);
+    if (state.balance < SHOP_PRICES.cheatMeal) {
+      throw new BadRequestException('Solde insuffisant');
+    }
+    // Débit + pose du cheat, atomiques. ref = le jour → un seul cheat / jour.
+    try {
+      await this.prisma.$transaction([
+        this.prisma.coinTransaction.create({
+          data: {
+            user_id: userId,
+            amount: -SHOP_PRICES.cheatMeal,
+            reason: 'buy_cheat_meal',
+            ref: todayKey,
+          },
+        }),
+        this.prisma.days.update({
+          where: { id: today.id },
+          data: { cheat_slot: slot },
+        }),
+      ]);
+    } catch (e) {
+      if ((e as { code?: string }).code === 'P2002') {
+        throw new BadRequestException('Un repas est déjà réparé aujourd’hui');
+      }
+      throw e;
+    }
+    return this.getWallet(userId);
+  }
+
+  private slotScore(day: Days, slot: string): string | null {
+    if (slot === 'morning') return day.morning_score;
+    if (slot === 'afternoon') return day.afternoon_score;
+    return day.evening_score;
   }
 
   // Crédite en lazy (idempotent) tous les gains d'« exploits », comme le
