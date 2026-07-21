@@ -91,7 +91,10 @@ describe('RewardsService.getRewards', () => {
     expect(r.week.offers![0].id).not.toBe(r.week.offers![1].id);
     // The two offers must be different families (not "3 vs 6 jours" du même kind).
     expect(r.week.offers![0].kindId).not.toBe(r.week.offers![1].kindId);
-    expect(r.month.points).toBe(0);
+    // Mois de lancement (juillet 2026) : plancher « 1 pt / jour écoulé » pour
+    // tous → 22 pts au 22/07, même sans aucun jour suivi. Badge (35) pas encore.
+    expect(r.month.points).toBe(22);
+    expect(r.month.fromDays).toBe(22);
     expect(r.month.threshold).toBe(35);
     expect(r.month.badge.unlocked).toBe(false);
   });

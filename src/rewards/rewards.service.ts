@@ -205,7 +205,7 @@ export class RewardsService {
     for (const { year, month } of this.monthsToEvaluate(now)) {
       const id = badgeIdFor(year, month);
       if (have.has(id)) continue;
-      if (isBadgeUnlocked(computeMonthlyPoints(days, won, year, month))) {
+      if (isBadgeUnlocked(computeMonthlyPoints(days, won, year, month, now))) {
         toCreate.push({ badge_id: id, unlocked_at: now });
       }
     }
@@ -356,7 +356,7 @@ export class RewardsService {
     const year = now.getUTCFullYear();
     const month = now.getUTCMonth() + 1;
     const won = state.weekly.filter((w) => w.status === 'won');
-    const points = computeMonthlyPoints(state.days, won, year, month);
+    const points = computeMonthlyPoints(state.days, won, year, month, now);
     const season = seasonForMonth(month);
     const id = badgeIdFor(year, month);
     return {
