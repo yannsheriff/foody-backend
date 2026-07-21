@@ -3,8 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Days } from '@prisma/client';
 import {
   computeDayScore,
+  computeRecordStreak,
   countsForStreak,
-  diffDays,
   isDayFullyTracked,
   startOfDay,
   ymd,
@@ -55,7 +55,7 @@ export class InsightsService {
       }
     }
 
-    const record = this.computeRecordStreak(sorted);
+    const record = computeRecordStreak(days);
     const last = sorted.find((d) => isDayFullyTracked(d));
     return {
       current,
@@ -90,11 +90,7 @@ export class InsightsService {
     return {
       daysTracked: tracked.length,
       bestScore: Math.round(bestScore * 10) / 10,
-      streakRecord: this.computeRecordStreak(
-        [...days].sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-        ),
-      ),
+      streakRecord: computeRecordStreak(days),
       monthAverage,
     };
   }
@@ -347,27 +343,6 @@ export class InsightsService {
       where: { user_id: userId, ...(dateWindow && { date: dateWindow }) },
       orderBy: { date: 'asc' },
     });
-  }
-
-  private computeRecordStreak(sortedDesc: Days[]): number {
-    let max = 0;
-    let current = 0;
-    let prev: Date | null = null;
-    for (const d of sortedDesc) {
-      const date = startOfDay(new Date(d.date));
-      if (!countsForStreak(d)) {
-        current = 0;
-        prev = date;
-        continue;
-      }
-      if (prev && diffDays(prev, date) !== 1) {
-        current = 0;
-      }
-      current++;
-      if (current > max) max = current;
-      prev = date;
-    }
-    return max;
   }
 
   private weekNumber(date: Date): number {

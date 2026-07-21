@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { InsightsModule } from './insights/insights.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { EconomyModule } from './economy/economy.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     InsightsModule,
     RewardsModule,
     NotificationsModule,
+    EconomyModule,
   ],
   controllers: [AppController],
   providers: [AppService],

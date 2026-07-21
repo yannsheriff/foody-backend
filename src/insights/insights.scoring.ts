@@ -109,3 +109,29 @@ export function diffDays(a: Date, b: Date): number {
     (startOfDay(a).getTime() - startOfDay(b).getTime()) / 86_400_000,
   );
 }
+
+// Plus longue série d'« on-time » consécutifs jamais atteinte (record). Pur —
+// trie en interne. Extrait de InsightsService pour réutilisation (record streak,
+// paliers de flamme de l'économie). Chaque jour non-`countsForStreak` ou un trou
+// (≠ 1 jour) casse la série courante.
+export function computeRecordStreak(days: Days[]): number {
+  const sortedDesc = [...days].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  );
+  let max = 0;
+  let current = 0;
+  let prev: Date | null = null;
+  for (const d of sortedDesc) {
+    const date = startOfDay(new Date(d.date));
+    if (!countsForStreak(d)) {
+      current = 0;
+      prev = date;
+      continue;
+    }
+    if (prev && diffDays(prev, date) !== 1) current = 0;
+    current++;
+    if (current > max) max = current;
+    prev = date;
+  }
+  return max;
+}

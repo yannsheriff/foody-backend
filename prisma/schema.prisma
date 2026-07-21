@@ -27,6 +27,8 @@ model User {
   weekly        WeeklyChallenge[]
   badges        UserBadge[]
   subscriptions PushSubscription[]
+  coins         CoinTransaction[]
+  freezes       FreezeConsumption[]
 
   @@map("users")
 }
@@ -144,8 +146,47 @@ model Days {
   // Set server-side the first time all 3 meals are filled; never overwritten.
   // NULL = pre-feature row, treated as on-time for the streak (grandfathered).
   meals_completed_at DateTime?
+  // Économie Phase 3 — créneau du repas neutralisé par un cheat meal (choisi par
+  // l'utilisateur : 'morning'|'afternoon'|'evening'). Server-only (posé par
+  // l'endpoint boutique, jamais par un PATCH client). NULL = pas de cheat.
+  // Scoré comme un 'normal' dans le calcul /10.
+  cheat_slot         String?
   user               User        @relation(fields: [user_id], references: [id])
 
   @@index([user_id])
   @@map("days")
+}
+
+// Économie Phase 3 — grand livre des pièces (append-only). Solde = SUM(amount)
+// (dérivé, jamais stocké). Les crédits d'« exploits » (défis/badge/paliers de
+// flamme/bienvenue) sont idempotents via @@unique(user, reason, ref) et
+// backfillés au 1er passage ; les achats (débits) sont créés à l'acte.
+model CoinTransaction {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  amount     Int // signé : crédit > 0, débit (achat) < 0
+  reason     String // 'challenge_won'|'monthly_badge'|'flame_milestone'|'welcome'|'buy_cheat_meal'|'buy_freeze'
+  ref        String // idempotence des crédits : id défi / badge_id / 'milestone-<n>' / 'welcome'
+  created_at DateTime @default(now())
+  user       User     @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, reason, ref])
+  @@index([user_id])
+  @@map("coin_transactions")
+}
+
+// Économie Phase 3 — un gel de flamme consommé (auto, dernière défense après le
+// catch-up) pour couvrir un jour manqué. Stock de gel = #achats − #consommations.
+// `seen` pilote l'interstitiel / la notif « ta flamme a tenu ».
+model FreezeConsumption {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  day         DateTime // le jour manqué couvert (UTC, tronqué au jour)
+  consumed_at DateTime @default(now())
+  seen        Boolean  @default(false)
+  user        User     @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, day])
+  @@index([user_id])
+  @@map("freeze_consumptions")
 }
