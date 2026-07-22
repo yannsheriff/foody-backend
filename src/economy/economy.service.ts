@@ -5,11 +5,8 @@ import {
 } from '@nestjs/common';
 import { CoinTransaction, Days, FreezeConsumption } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  computeRecordStreak,
-  startOfDay,
-  ymd,
-} from '../insights/insights.scoring';
+import { startOfDay, ymd } from '../insights/insights.scoring';
+import { recordStreakWithBridges } from './freeze.progress';
 import {
   COIN_GAINS,
   FLAME_MILESTONES,
@@ -121,6 +118,45 @@ export class EconomyService {
     return day.evening_score;
   }
 
+  // ─── Gel de flamme (consommation & feedback) ─────────────────
+
+  /**
+   * Persiste la consommation d'un gel pour couvrir `day` (appelé par le calcul
+   * de flamme quand un jour manqué past-grace est pontable). Idempotent :
+   * l'unique (user, day) absorbe les lectures concurrentes.
+   */
+  async consumeFreeze(userId: number, day: Date): Promise<void> {
+    try {
+      await this.prisma.freezeConsumption.create({
+        data: { user_id: userId, day: startOfDay(day) },
+      });
+    } catch (e) {
+      if ((e as { code?: string }).code !== 'P2002') throw e;
+    }
+  }
+
+  /** La conso non encore vue la plus récente (pilote l'interstitiel). */
+  async unseenFreeze(
+    userId: number,
+  ): Promise<{ day: string; consumedAt: Date } | null> {
+    const rows = await this.prisma.freezeConsumption.findMany({
+      where: { user_id: userId, seen: false },
+      orderBy: { consumed_at: 'desc' },
+      take: 1,
+    });
+    if (rows.length === 0) return null;
+    return { day: ymd(new Date(rows[0].day)), consumedAt: rows[0].consumed_at };
+  }
+
+  /** Marque toutes les consos comme vues (dismiss de l'interstitiel). */
+  async ackFreeze(userId: number): Promise<{ ok: true }> {
+    await this.prisma.freezeConsumption.updateMany({
+      where: { user_id: userId, seen: false },
+      data: { seen: true },
+    });
+    return { ok: true };
+  }
+
   // Crédite en lazy (idempotent) tous les gains d'« exploits », comme le
   // unlock/backfill des badges : un utilisateur existant touche rétroactivement
   // ses défis gagnés, badges mensuels, paliers de flamme et la bienvenue à son
@@ -158,8 +194,12 @@ export class EconomyService {
         amount: COIN_GAINS.monthlyBadge,
       });
     }
-    // Paliers de flamme franchis d'après le record → +15 chacun.
-    const record = computeRecordStreak(days);
+    // Paliers de flamme franchis d'après le record → +15 chacun. Les jours
+    // pontés par un gel comptent (la série a tenu).
+    const record = recordStreakWithBridges(
+      days,
+      new Set(consumptions.map((c) => ymd(new Date(c.day)))),
+    );
     for (const m of FLAME_MILESTONES) {
       if (record >= m) {
         expected.push({

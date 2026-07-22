@@ -47,4 +47,13 @@ export class EconomyController {
   ): Promise<WalletDto> {
     return this.economy.buyCheatMeal(req.user.id, body.slot);
   }
+
+  @Post('freeze/ack')
+  @ApiOperation({
+    summary: 'Marquer vu le « gel consommé » (dismiss de l’interstitiel)',
+  })
+  @ApiResponse({ status: 201 })
+  ackFreeze(@Req() req: AuthedRequest): Promise<{ ok: true }> {
+    return this.economy.ackFreeze(req.user.id);
+  }
 }

@@ -30,11 +30,42 @@ function mkDay(over: Partial<Days> & { date: Date }): Days {
   } as Days;
 }
 
-function mkService(days: Days[]): InsightsService {
+interface EcoOver {
+  stock?: number;
+  consumptions?: { day: Date }[];
+}
+
+// Mock EconomyService — par défaut : pas de gel, pas de conso (comportement
+// historique de la flamme, inchangé).
+function mkEconomy(over: EcoOver = {}) {
+  const consumptions = over.consumptions ?? [];
+  return {
+    loadAndSync: jest.fn().mockResolvedValue({
+      txns: [],
+      consumptions,
+      balance: 0,
+      freezeStock: over.stock ?? 0,
+    }),
+    consumeFreeze: jest.fn().mockResolvedValue(undefined),
+    unseenFreeze: jest.fn().mockResolvedValue(null),
+  };
+}
+
+function mkService(days: Days[], eco: EcoOver = {}): InsightsService {
+  return mkServiceWithEconomy(days, mkEconomy(eco));
+}
+
+function mkServiceWithEconomy(
+  days: Days[],
+  economy: ReturnType<typeof mkEconomy>,
+): InsightsService {
   const prisma = {
     days: { findMany: jest.fn().mockResolvedValue(days) },
+    freezeConsumption: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   };
-  return new InsightsService(prisma as never);
+  return new InsightsService(prisma as never, economy as never);
 }
 
 describe('InsightsService.getStreak', () => {
@@ -189,5 +220,45 @@ describe('InsightsService.getOverview', () => {
     const o2 = await mkService(few).getOverview(1);
     expect(o2.bestDay).toBeNull();
     expect(o2.worstDay).toBeNull();
+  });
+});
+
+describe('getStreak — gel de flamme (Phase 3)', () => {
+  // today + hier on-time, D-2 manqué (past-grace quelle que soit l'heure),
+  // D-3..D-5 on-time.
+  const holey = () => [0, 1, 3, 4, 5].map((o) => mkDay({ date: dayAt(o) }));
+  const holeYmd = () => dayAt(2).toISOString().slice(0, 10);
+
+  it('consomme un gel en stock pour ponter le jour manqué', async () => {
+    const economy = mkEconomy({ stock: 1 });
+    economy.unseenFreeze.mockResolvedValue({
+      day: holeYmd(),
+      consumedAt: new Date(),
+    });
+    const service = mkServiceWithEconomy(holey(), economy);
+    const s = await service.getStreak(1);
+    expect(economy.consumeFreeze).toHaveBeenCalledTimes(1);
+    const consumedDay = economy.consumeFreeze.mock.calls[0][1] as Date;
+    expect(consumedDay.toISOString().slice(0, 10)).toBe(holeYmd());
+    expect(s.current).toBe(6); // 2 + pont + 3
+    expect(s.freezeConsumed).toEqual({ day: holeYmd(), stock: 0 });
+  });
+
+  it('sans stock : la flamme casse au trou, rien n’est consommé', async () => {
+    const economy = mkEconomy({ stock: 0 });
+    const service = mkServiceWithEconomy(holey(), economy);
+    const s = await service.getStreak(1);
+    expect(economy.consumeFreeze).not.toHaveBeenCalled();
+    expect(s.current).toBe(2);
+    expect(s.freezeConsumed).toBeNull();
+  });
+
+  it('un pont déjà persisté compte sans nouvelle conso (figé)', async () => {
+    const economy = mkEconomy({ stock: 0, consumptions: [{ day: dayAt(2) }] });
+    const service = mkServiceWithEconomy(holey(), economy);
+    const s = await service.getStreak(1);
+    expect(economy.consumeFreeze).not.toHaveBeenCalled();
+    expect(s.current).toBe(6);
+    expect(s.record).toBe(6); // le record compte le pont aussi
   });
 });

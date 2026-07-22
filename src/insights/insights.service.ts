@@ -3,12 +3,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Days } from '@prisma/client';
 import {
   computeDayScore,
-  computeRecordStreak,
   countsForStreak,
   isDayFullyTracked,
   startOfDay,
   ymd,
 } from './insights.scoring';
+import { EconomyService } from '../economy/economy.service';
+import {
+  currentStreakWithBridges,
+  findBridgeCandidate,
+  recordStreakWithBridges,
+} from '../economy/freeze.progress';
 import { StreakDto } from './dto/streak.dto';
 import { RecordsDto } from './dto/records.dto';
 import { StatsDto } from './dto/stats.dto';
@@ -16,51 +21,44 @@ import { OverviewDto } from './dto/overview.dto';
 
 @Injectable()
 export class InsightsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private economy: EconomyService,
+  ) {}
 
+  // Streak = consecutive on-time days ending today or yesterday (late-backfilled
+  // days never revive a lost flame). Gel de flamme (Phase 3) : les jours couverts
+  // par un FreezeConsumption sont des « ponts » qui comptent comme on-time — et
+  // un gel en stock se consomme ici, en lazy, dès qu'un jour manqué past-grace
+  // pontable augmente la série (jamais tant que le catch-up peut rattraper).
   async getStreak(userId: number): Promise<StreakDto> {
+    const now = new Date();
     const days = await this.loadDays(userId);
+
+    const economy = await this.economy.loadAndSync(userId);
+    const bridges = new Set(
+      economy.consumptions.map((c) => ymd(new Date(c.day))),
+    );
+    let stock = economy.freezeStock;
+    const candidate = findBridgeCandidate(days, bridges, stock, now);
+    if (candidate) {
+      await this.economy.consumeFreeze(userId, candidate);
+      bridges.add(ymd(candidate));
+      stock -= 1;
+    }
+
+    const current = currentStreakWithBridges(days, bridges, now);
+    const record = recordStreakWithBridges(days, bridges);
     const sorted = [...days].sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
     );
-
-    const today = startOfDay(new Date());
-    const yesterday = new Date(today.getTime() - 86_400_000);
-
-    let current = 0;
-    let cursor: Date | null = null;
-    // Streak starts at most recent on-time fully-tracked day that is today or
-    // yesterday. Late-backfilled days never revive a lost flame.
-    const head = sorted.find((d) => countsForStreak(d));
-    if (head) {
-      const headDate = startOfDay(new Date(head.date));
-      if (
-        headDate.getTime() === today.getTime() ||
-        headDate.getTime() === yesterday.getTime()
-      ) {
-        cursor = headDate;
-        for (const d of sorted) {
-          const date = startOfDay(new Date(d.date));
-          if (
-            cursor &&
-            date.getTime() === cursor.getTime() &&
-            countsForStreak(d)
-          ) {
-            current++;
-            cursor = new Date(cursor.getTime() - 86_400_000);
-          } else if (date.getTime() < cursor!.getTime()) {
-            break;
-          }
-        }
-      }
-    }
-
-    const record = computeRecordStreak(days);
     const last = sorted.find((d) => isDayFullyTracked(d));
+    const unseen = await this.economy.unseenFreeze(userId);
     return {
       current,
       record,
       lastFilledDate: last ? ymd(new Date(last.date)) : null,
+      freezeConsumed: unseen ? { day: unseen.day, stock } : null,
     };
   }
 
@@ -90,7 +88,16 @@ export class InsightsService {
     return {
       daysTracked: tracked.length,
       bestScore: Math.round(bestScore * 10) / 10,
-      streakRecord: computeRecordStreak(days),
+      streakRecord: recordStreakWithBridges(
+        days,
+        new Set(
+          (
+            await this.prisma.freezeConsumption.findMany({
+              where: { user_id: userId },
+            })
+          ).map((c) => ymd(new Date(c.day))),
+        ),
+      ),
       monthAverage,
     };
   }
