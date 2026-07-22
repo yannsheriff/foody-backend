@@ -17,8 +17,16 @@ export const SPORT_POINTS: Record<SportLevel, number> = {
   intense: 3,
 };
 
-function mealPoints(level: Score | null): number {
+const HEAVY_LEVELS: Score[] = ['copieux', 'tresCopieux'];
+
+// Cheat meal (économie Phase 3) : le repas du créneau `cheat_slot` — s'il est
+// lourd — est scoré comme un « normal » (1,5). Substitution UNIQUEMENT si le
+// repas est lourd : un cheat posé ne peut jamais BAISSER la note (un repas
+// réédité en léger garde ses 2,25). Règle à garder synchro dans les 3 copies
+// (day-score.ts, DayScore.swift) — vérifiée par scoring-contract.spec.ts.
+function mealPoints(level: Score | null, cheated = false): number {
   if (level == null) return 0;
+  if (cheated && HEAVY_LEVELS.includes(level)) return MEAL_POINTS.normal;
   return MEAL_POINTS[level] ?? 0;
 }
 
@@ -29,9 +37,9 @@ export function sportPoints(day: Days): number {
 
 export function computeDayScore(day: Days): number {
   const meals =
-    mealPoints(day.morning_score) +
-    mealPoints(day.afternoon_score) +
-    mealPoints(day.evening_score);
+    mealPoints(day.morning_score, day.cheat_slot === 'morning') +
+    mealPoints(day.afternoon_score, day.cheat_slot === 'afternoon') +
+    mealPoints(day.evening_score, day.cheat_slot === 'evening');
   const sport = sportPoints(day);
   const snack = day.snack == null ? 0 : 2 * (1 - day.snack);
   const capped = Math.min(10, meals + sport + snack);
@@ -56,8 +64,6 @@ export function isDayFullyTracked(day: Days): boolean {
     day.evening_score != null
   );
 }
-
-const HEAVY_LEVELS: Score[] = ['copieux', 'tresCopieux'];
 
 export function hasHeavyMeal(day: Days): boolean {
   return [day.morning_score, day.afternoon_score, day.evening_score].some(

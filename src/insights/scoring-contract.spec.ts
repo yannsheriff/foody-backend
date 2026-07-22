@@ -58,5 +58,48 @@ const hasFrontend = fs.existsSync(MEAL_LEVELS_PATH);
       // eslint-disable-next-line no-eval
       expect(eval(match![1])).toBe(GRACE_CUTOFF_MINUTES);
     });
+
+    // Cheat meal (Phase 3) : comparaison COMPORTEMENTALE — les deux
+    // implémentations complètes sont exécutées sur les mêmes jours canoniques
+    // (avec et sans cheat) et doivent rendre exactement la même note.
+    it('même règle cheat meal (repas lourd cheaté → normal)', () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const dayScore = require(
+        path.join(FRONTEND_ROOT, 'src/utils/day-score.ts'),
+      ) as {
+        computeScore: (day: Record<string, unknown>) => number;
+      };
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { computeDayScore } = require('./insights.scoring') as {
+        computeDayScore: (day: Record<string, unknown>) => number;
+      };
+
+      const canonical = [
+        // [matin, midi, soir (kebab wire)] — le backend reçoit la version Prisma.
+        { meals: ['leger', 'normal', 'tres-copieux'], snack: 0.5, cheat: 'evening' },
+        { meals: ['copieux', 'copieux', 'leger'], snack: 0, cheat: 'morning' },
+        { meals: ['leger', 'normal', 'tres-copieux'], snack: 0.5, cheat: 'morning' }, // non lourd → sans effet
+        { meals: ['leger', 'normal', 'tres-copieux'], snack: 0.5, cheat: null },
+      ];
+      for (const c of canonical) {
+        const front = dayScore.computeScore({
+          morning_score: c.meals[0],
+          afternoon_score: c.meals[1],
+          evening_score: c.meals[2],
+          snack: c.snack,
+          sport_level: null,
+          cheat_slot: c.cheat,
+        });
+        const back = computeDayScore({
+          morning_score: toPrismaScore(c.meals[0]),
+          afternoon_score: toPrismaScore(c.meals[1]),
+          evening_score: toPrismaScore(c.meals[2]),
+          snack: c.snack,
+          sport_level: null,
+          cheat_slot: c.cheat,
+        });
+        expect(back).toBe(front);
+      }
+    });
   },
 );

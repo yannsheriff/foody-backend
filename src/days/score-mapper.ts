@@ -49,6 +49,10 @@ export interface DayWire {
   // representation, so no mapping needed (unlike Score).
   sport_level: string | null;
   sport_type: string | null;
+  // Créneau du repas neutralisé par un cheat meal (Phase 3) — lecture seule
+  // côté client (posé par POST /me/shop/cheat-meal, strippé des PATCH par le
+  // ValidationPipe whitelist).
+  cheat_slot: string | null;
   date: Date;
 }
 
@@ -63,6 +67,7 @@ export function toWire(day: Days): DayWire {
     sport: day.sport,
     sport_level: day.sport_level,
     sport_type: day.sport_type,
+    cheat_slot: day.cheat_slot,
     date: day.date,
   };
 }
