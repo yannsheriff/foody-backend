@@ -79,13 +79,20 @@ describe('WEEKLY_CATALOG · every entry is completable and non-trivial', () => {
   for (const def of WEEKLY_CATALOG) {
     it(`${def.id} completes with a full qualifying week`, () => {
       const days = [0, 1, 2, 3, 4, 5, 6].map((o) =>
-        qualifyingDay(def, new Date(WEEK.weekStart.getTime() + o * 86_400_000 + 12 * 3_600_000)),
+        qualifyingDay(
+          def,
+          new Date(WEEK.weekStart.getTime() + o * 86_400_000 + 12 * 3_600_000),
+        ),
       );
-      expect(resolveWeekly(def, def.total, days, WEEK.weekStart, WEEK.weekEnd).won).toBe(true);
+      expect(
+        resolveWeekly(def, def.total, days, WEEK.weekStart, WEEK.weekEnd).won,
+      ).toBe(true);
     });
 
     it(`${def.id} is not free (empty week fails)`, () => {
-      expect(resolveWeekly(def, def.total, [], WEEK.weekStart, WEEK.weekEnd).won).toBe(false);
+      expect(
+        resolveWeekly(def, def.total, [], WEEK.weekStart, WEEK.weekEnd).won,
+      ).toBe(false);
     });
   }
 });

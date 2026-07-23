@@ -44,7 +44,8 @@ export function isoWeekOf(date: Date): string {
   firstThursday.setUTCDate(
     firstThursday.getUTCDate() - mondayIndex(firstThursday) + 3,
   );
-  const week = 1 + Math.round((d.getTime() - firstThursday.getTime()) / (7 * DAY_MS));
+  const week =
+    1 + Math.round((d.getTime() - firstThursday.getTime()) / (7 * DAY_MS));
   return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
@@ -127,8 +128,14 @@ export function qualifiesWeekly(def: WeeklyChallengeDef, d: Days): boolean {
 
 // Is a given UTC calendar day (ymd key) qualifying? OR over all rows of that day,
 // so duplicate `days` rows can't hide a qualifying entry.
-function dayQualifies(days: Days[], def: WeeklyChallengeDef, key: string): boolean {
-  return days.some((d) => ymd(new Date(d.date)) === key && qualifiesWeekly(def, d));
+function dayQualifies(
+  days: Days[],
+  def: WeeklyChallengeDef,
+  key: string,
+): boolean {
+  return days.some(
+    (d) => ymd(new Date(d.date)) === key && qualifiesWeekly(def, d),
+  );
 }
 
 // A weekend is clean when BOTH its Saturday and Sunday qualify — but only once

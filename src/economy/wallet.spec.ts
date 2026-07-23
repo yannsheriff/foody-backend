@@ -24,7 +24,11 @@ const consumption = (): FreezeConsumption =>
 describe('computeBalance', () => {
   it('sums signed amounts (credits + debits)', () => {
     expect(
-      computeBalance([tx({ amount: 15 }), tx({ amount: 25 }), tx({ amount: -70 })]),
+      computeBalance([
+        tx({ amount: 15 }),
+        tx({ amount: 25 }),
+        tx({ amount: -70 }),
+      ]),
     ).toBe(-30);
   });
   it('is 0 with no transactions', () => {

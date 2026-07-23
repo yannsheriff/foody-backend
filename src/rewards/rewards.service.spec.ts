@@ -1,6 +1,7 @@
 import { Days, UserBadge, WeeklyChallenge } from '@prisma/client';
 import { RewardsService } from './rewards.service';
 import { weekBounds } from './weekly.progress';
+import { weeklyById } from './weekly-catalog.constants';
 
 const NOW = new Date(Date.UTC(2026, 6, 22, 10)); // Wed 22 Jul 2026, 10:00 UTC
 const WEEK = weekBounds(NOW);
@@ -40,22 +41,38 @@ function mkWeekly(over: Partial<WeeklyChallenge>): WeeklyChallenge {
   } as WeeklyChallenge;
 }
 function dayInLastWeek(offset: number): Date {
-  return new Date(LAST_WEEK.weekStart.getTime() + offset * 86_400_000 + 12 * 3_600_000);
+  return new Date(
+    LAST_WEEK.weekStart.getTime() + offset * 86_400_000 + 12 * 3_600_000,
+  );
 }
 
 interface PrismaMock {
   days: { findMany: jest.Mock };
-  weeklyChallenge: { findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
+  weeklyChallenge: {
+    findMany: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+  };
   userBadge: { findMany: jest.Mock; create: jest.Mock };
+  user: { findUnique: jest.Mock; update: jest.Mock };
 }
 function mkService(opts: {
   days?: Days[];
   weekly?: WeeklyChallenge[];
   badges?: UserBadge[];
+  intention?: string | null;
 }): { service: RewardsService; prisma: PrismaMock } {
   const weekly = opts.weekly ?? [];
   let seq = 5000;
   const prisma: PrismaMock = {
+    user: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 1,
+        email: 'x@x.fr',
+        intention: opts.intention ?? null,
+      }),
+      update: jest.fn().mockResolvedValue({}),
+    },
     days: { findMany: jest.fn().mockResolvedValue(opts.days ?? []) },
     weeklyChallenge: {
       findMany: jest.fn().mockResolvedValue(weekly),
@@ -70,12 +87,19 @@ function mkService(opts: {
         }),
       ),
       update: jest.fn().mockImplementation(({ where, data }) =>
-        Promise.resolve({ ...weekly.find((w) => w.id === where.id), ...data }),
+        Promise.resolve({
+          ...weekly.find((w) => w.id === where.id),
+          ...data,
+        }),
       ),
     },
     userBadge: {
       findMany: jest.fn().mockResolvedValue(opts.badges ?? []),
-      create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: seq++, ...data })),
+      create: jest
+        .fn()
+        .mockImplementation(({ data }) =>
+          Promise.resolve({ id: seq++, ...data }),
+        ),
     },
   };
   return { service: new RewardsService(prisma as never), prisma };
@@ -87,7 +111,10 @@ describe('RewardsService.getRewards', () => {
     const r = await service.getRewards(1, NOW);
     expect(r.week.challenge).toBeNull();
     expect(r.week.offers).toHaveLength(2);
-    expect(r.week.offers!.map((o) => o.flavor)).toEqual(['accessible', 'ambitious']);
+    expect(r.week.offers!.map((o) => o.flavor)).toEqual([
+      'accessible',
+      'ambitious',
+    ]);
     expect(r.week.offers![0].id).not.toBe(r.week.offers![1].id);
     // The two offers must be different families (not "3 vs 6 jours" du même kind).
     expect(r.week.offers![0].kindId).not.toBe(r.week.offers![1].kindId);
@@ -101,13 +128,24 @@ describe('RewardsService.getRewards', () => {
 
   it('exposes the chosen challenge with live progress', async () => {
     const days = [0, 1].map((o) =>
-      mkDay({ date: new Date(WEEK.weekStart.getTime() + o * 86_400_000 + 12 * 3_600_000) }),
+      mkDay({
+        date: new Date(
+          WEEK.weekStart.getTime() + o * 86_400_000 + 12 * 3_600_000,
+        ),
+      }),
     );
-    const weekly = [mkWeekly({ challenge_id: 'w-saisie-3', target: 3, flavor: 'accessible' })];
+    const weekly = [
+      mkWeekly({ challenge_id: 'w-saisie-3', target: 3, flavor: 'accessible' }),
+    ];
     const { service } = mkService({ days, weekly });
     const r = await service.getRewards(1, NOW);
     expect(r.week.offers).toBeNull();
-    expect(r.week.challenge).toMatchObject({ id: 'w-saisie-3', prog: 2, target: 3, rewardPoints: 5 });
+    expect(r.week.challenge).toMatchObject({
+      id: 'w-saisie-3',
+      prog: 2,
+      target: 3,
+      rewardPoints: 5,
+    });
   });
 });
 
@@ -121,20 +159,28 @@ describe('RewardsService.selectWeekly', () => {
     expect(active.flavor).toBe('ambitious');
     expect(prisma.weeklyChallenge.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ challenge_id: chosen.id, flavor: 'ambitious', iso_week: WEEK.isoWeek }),
+        data: expect.objectContaining({
+          challenge_id: chosen.id,
+          flavor: 'ambitious',
+          iso_week: WEEK.isoWeek,
+        }),
       }),
     );
   });
 
   it('rejects a challenge that was not offered (400)', async () => {
     const { service } = mkService({});
-    await expect(service.selectWeekly(1, 'w-sport-4', NOW)).rejects.toMatchObject({ status: 400 });
+    await expect(
+      service.selectWeekly(1, 'w-sport-4', NOW),
+    ).rejects.toMatchObject({ status: 400 });
   });
 
   it('409 when a challenge is already chosen this week', async () => {
     const weekly = [mkWeekly({ iso_week: WEEK.isoWeek })];
     const { service } = mkService({ weekly });
-    await expect(service.selectWeekly(1, 'w-saisie-3', NOW)).rejects.toMatchObject({ status: 409 });
+    await expect(
+      service.selectWeekly(1, 'w-saisie-3', NOW),
+    ).rejects.toMatchObject({ status: 409 });
   });
 });
 
@@ -177,7 +223,9 @@ describe('RewardsService · lazy resolution', () => {
     const { service, prisma } = mkService({ days, weekly });
     await service.getRewards(1, NOW);
     expect(prisma.weeklyChallenge.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'lost', reward_points: null }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'lost', reward_points: null }),
+      }),
     );
   });
 });
@@ -191,7 +239,9 @@ describe('RewardsService · badges (backfill + monthly)', () => {
     const { service, prisma } = mkService({ days });
     const badges = await service.getBadges(1, NOW);
     expect(prisma.userBadge.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ badge_id: 'constance' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ badge_id: 'constance' }),
+      }),
     );
     expect(badges.find((b) => b.id === 'constance')?.unlocked).toBe(true);
   });
@@ -201,11 +251,18 @@ describe('RewardsService · badges (backfill + monthly)', () => {
       mkDay({ date: new Date(NOW.getTime() - o * 86_400_000) }),
     );
     const badges: UserBadge[] = [
-      { id: 1, user_id: 1, badge_id: 'constance', unlocked_at: new Date() } as UserBadge,
+      {
+        id: 1,
+        user_id: 1,
+        badge_id: 'constance',
+        unlocked_at: new Date(),
+      } as UserBadge,
     ];
     const { service, prisma } = mkService({ days, badges });
     await service.getBadges(1, NOW);
-    const created = prisma.userBadge.create.mock.calls.map((c) => c[0].data.badge_id);
+    const created = prisma.userBadge.create.mock.calls.map(
+      (c) => c[0].data.badge_id,
+    );
     expect(created).not.toContain('constance');
   });
 
@@ -228,7 +285,9 @@ describe('RewardsService · badges (backfill + monthly)', () => {
     expect(r.month.points).toBeGreaterThanOrEqual(35);
     expect(r.month.badge.unlocked).toBe(true);
     expect(prisma.userBadge.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ badge_id: 'season-2026-07' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ badge_id: 'season-2026-07' }),
+      }),
     );
   });
 });
@@ -243,5 +302,67 @@ describe('RewardsService.getCollection', () => {
     expect(c.monthly.find((m) => m.month === 8)?.state).toBe('future');
     expect(c.monthly.find((m) => m.month === 6)).toBeUndefined();
     expect(c.achievements.length).toBeGreaterThan(0);
+  });
+});
+
+describe('RewardsService — tirage adaptatif (Phase 4)', () => {
+  const ratingOf = (id: string) => weeklyById(id)!.rating;
+
+  function wonWeeksAgo(n: number, flavor: 'accessible' | 'ambitious') {
+    const { weekStart } = weekBounds(NOW);
+    const bounds = weekBounds(
+      new Date(weekStart.getTime() - n * 7 * 86_400_000),
+    );
+    return mkWeekly({
+      iso_week: bounds.isoWeek,
+      week_start: bounds.weekStart,
+      week_end: bounds.weekEnd,
+      status: 'won',
+      flavor,
+      reward_points: flavor === 'ambitious' ? 10 : 5,
+    });
+  }
+
+  it('un nouveau (ELO 1000) reçoit les défis les plus doux du catalogue', async () => {
+    const { service } = mkService({});
+    const r = await service.getRewards(1, NOW);
+    // accessible ∈ [850, 1000] (fallback plus-proches si vide) → rating ≤ 1150
+    expect(ratingOf(r.week.offers![0].id)).toBeLessThanOrEqual(1150);
+  });
+
+  it('après des victoires, les offres montent en difficulté', async () => {
+    // 8 victoires ambitieuses = ELO 1000 + 8×50 = 1400.
+    const weekly = Array.from({ length: 8 }, (_, i) =>
+      wonWeeksAgo(8 - i, 'ambitious'),
+    );
+    const { service } = mkService({ weekly });
+    const r = await service.getRewards(1, NOW);
+    const [acc, amb] = r.week.offers!;
+    // accessible ∈ [1250, 1400] · ambitieux ∈ [1400, 1550]
+    expect(ratingOf(acc.id)).toBeGreaterThanOrEqual(1250);
+    expect(ratingOf(acc.id)).toBeLessThanOrEqual(1400);
+    expect(ratingOf(amb.id)).toBeGreaterThanOrEqual(1400);
+    expect(ratingOf(amb.id)).toBeLessThanOrEqual(1550);
+  });
+
+  it('un échec fait retomber les offres tout de suite (montée lente, descente rapide)', async () => {
+    // 2 victoires accessibles puis 1 échec : 1000 +25 +25 −50 = 1000 (plancher).
+    const { weekStart } = weekBounds(NOW);
+    const lostBounds = weekBounds(
+      new Date(weekStart.getTime() - 7 * 86_400_000),
+    );
+    const weekly = [
+      wonWeeksAgo(3, 'accessible'),
+      wonWeeksAgo(2, 'accessible'),
+      mkWeekly({
+        iso_week: lostBounds.isoWeek,
+        week_start: lostBounds.weekStart,
+        week_end: lostBounds.weekEnd,
+        status: 'lost',
+      }),
+    ];
+    const { service } = mkService({ weekly });
+    const r = await service.getRewards(1, NOW);
+    expect(ratingOf(r.week.offers![0].id)).toBeLessThanOrEqual(1150);
   });
 });

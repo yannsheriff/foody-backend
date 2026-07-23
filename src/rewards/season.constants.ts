@@ -16,7 +16,8 @@ export const SEASONS: Season[] = [
     month: 1,
     title: 'Reprise',
     emoji: '🌱',
-    description: 'Le badge de janvier. On repart en douceur — de la régularité, sans forcer.',
+    description:
+      'Le badge de janvier. On repart en douceur — de la régularité, sans forcer.',
     boostedKinds: ['saisie', 'note'],
   },
   {
@@ -72,7 +73,8 @@ export const SEASONS: Season[] = [
     month: 9,
     title: 'Vendanges',
     emoji: '🍇',
-    description: 'Le badge de septembre. On récolte ce qu’on a semé — reste léger.',
+    description:
+      'Le badge de septembre. On récolte ce qu’on a semé — reste léger.',
     boostedKinds: ['copieux', 'saisie'],
   },
   {
@@ -86,7 +88,8 @@ export const SEASONS: Season[] = [
     month: 11,
     title: 'Veillée',
     emoji: '🌰',
-    description: 'Le badge de novembre. Les soirées rallongent — tiens le grignotage.',
+    description:
+      'Le badge de novembre. Les soirées rallongent — tiens le grignotage.',
     boostedKinds: ['grignotage', 'soir-leger'],
   },
   {

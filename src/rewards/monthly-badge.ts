@@ -33,7 +33,11 @@ function daysInMonth(year: number, month: number): number {
 // Jours écoulés du mois (UTC) à la date `now`, capés au nombre de jours du mois :
 // 0 si le mois n'a pas encore commencé, tous ses jours s'il est passé, sinon le
 // quantième courant.
-export function elapsedDaysInMonth(year: number, month: number, now: Date): number {
+export function elapsedDaysInMonth(
+  year: number,
+  month: number,
+  now: Date,
+): number {
   const monthStart = Date.UTC(year, month - 1, 1);
   const nextMonthStart = Date.UTC(year, month, 1);
   const t = now.getTime();

@@ -32,7 +32,8 @@ function mkDay(date: Date): Days {
   } as Days;
 }
 
-const bridgeAt = (offset: number) => ymd(new Date(TODAY.getTime() - offset * 86_400_000));
+const bridgeAt = (offset: number) =>
+  ymd(new Date(TODAY.getTime() - offset * 86_400_000));
 
 describe('currentStreakWithBridges', () => {
   it('sans pont : la série casse au jour manqué', () => {

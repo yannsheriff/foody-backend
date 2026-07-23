@@ -22,6 +22,9 @@ model User {
   password      String
   // Identifiant stable « Sign in with Apple » (claim sub) — null si compte email.
   apple_sub     String?            @unique
+  // Intention d'onboarding ('lose'|'maintain'|'aware'|'snack') — synchronisée
+  // par le client (POST /me/intention), pondère le tirage des défis (Phase 4).
+  intention     String?
   days          Days[]
   challenges    UserChallenge[]
   weekly        WeeklyChallenge[]

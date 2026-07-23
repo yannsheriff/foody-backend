@@ -255,7 +255,8 @@ export const WEEKLY_CATALOG: WeeklyChallengeDef[] = [
     title: "Le corps et l'assiette, 2 fois",
     kind: 'combo',
     kindLabel: KIND_LABELS.combo,
-    description: 'Du sport ET un dîner léger le même jour — 2 jours cette semaine.',
+    description:
+      'Du sport ET un dîner léger le même jour — 2 jours cette semaine.',
     rating: 1400,
     total: 2,
   },
@@ -265,7 +266,8 @@ export const WEEKLY_CATALOG: WeeklyChallengeDef[] = [
     title: "Le corps et l'assiette, 3 fois",
     kind: 'combo',
     kindLabel: KIND_LABELS.combo,
-    description: 'Du sport ET un dîner léger le même jour — 3 jours cette semaine.',
+    description:
+      'Du sport ET un dîner léger le même jour — 3 jours cette semaine.',
     rating: 1650,
     total: 3,
   },
@@ -276,7 +278,8 @@ export const WEEKLY_CATALOG: WeeklyChallengeDef[] = [
     title: '5 repas légers cette semaine',
     kind: 'volume',
     kindLabel: KIND_LABELS.volume,
-    description: 'Des repas légers ou très légers — 5 en tout, peu importe la répartition.',
+    description:
+      'Des repas légers ou très légers — 5 en tout, peu importe la répartition.',
     rating: 1150,
     total: 5,
   },
@@ -286,7 +289,8 @@ export const WEEKLY_CATALOG: WeeklyChallengeDef[] = [
     title: '10 repas légers cette semaine',
     kind: 'volume',
     kindLabel: KIND_LABELS.volume,
-    description: 'Des repas légers ou très légers — 10 en tout, peu importe la répartition.',
+    description:
+      'Des repas légers ou très légers — 10 en tout, peu importe la répartition.',
     rating: 1500,
     total: 10,
   },
@@ -308,6 +312,15 @@ export function weeklyById(id: string): WeeklyChallengeDef | undefined {
 }
 
 export type WeeklyFlavor = 'accessible' | 'ambitious';
+
+// Kinds mis en avant par intention d'onboarding — miroir de Intention.kinds
+// (iOS) et src/lib/intention.ts (web). Pondère le tirage (Phase 4, ×2).
+export const INTENTION_KINDS: Record<string, WeeklyKind[]> = {
+  lose: ['soir-leger', 'copieux', 'sport'],
+  maintain: ['note', 'weekend', 'saisie'],
+  aware: ['saisie', 'weekend'],
+  snack: ['grignotage'],
+};
 
 // Reward points by flavor — the ambitious offer is worth more. TUNABLE.
 export const FLAVOR_POINTS: Record<WeeklyFlavor, number> = {

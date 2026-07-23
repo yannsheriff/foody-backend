@@ -100,7 +100,9 @@ export class EconomyService {
     if (state.cheatStock < 1) {
       throw new BadRequestException('Aucun cheat meal en réserve');
     }
-    const days = await this.prisma.days.findMany({ where: { user_id: userId } });
+    const days = await this.prisma.days.findMany({
+      where: { user_id: userId },
+    });
     const today = days.find((d) => ymd(new Date(d.date)) === todayKey);
     if (!today) {
       throw new BadRequestException("Aucune journée à réparer aujourd'hui");
@@ -217,7 +219,11 @@ export class EconomyService {
       }
     }
     // Bienvenue — une fois.
-    expected.push({ reason: 'welcome', ref: 'welcome', amount: COIN_GAINS.welcome });
+    expected.push({
+      reason: 'welcome',
+      ref: 'welcome',
+      amount: COIN_GAINS.welcome,
+    });
 
     // Insère les crédits manquants (idempotent via @@unique(user, reason, ref)).
     const have = new Set(existing.map((t) => `${t.reason}:${t.ref}`));

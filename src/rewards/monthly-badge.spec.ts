@@ -21,7 +21,9 @@ function mkDay(over: Partial<Days> & { date: Date }): Days {
     ...over,
   } as Days;
 }
-function mkWon(over: Partial<WeeklyChallenge> & { week_end: Date }): WeeklyChallenge {
+function mkWon(
+  over: Partial<WeeklyChallenge> & { week_end: Date },
+): WeeklyChallenge {
   return {
     id: nextId++,
     user_id: 1,
@@ -114,7 +116,19 @@ describe('computeMonthlyPoints — plancher mois de lancement (juillet 2026)', (
 
 describe('isBadgeUnlocked', () => {
   it('unlocks at the threshold', () => {
-    expect(isBadgeUnlocked({ total: BADGE_THRESHOLD, fromDays: 25, fromChallenges: 10 })).toBe(true);
-    expect(isBadgeUnlocked({ total: BADGE_THRESHOLD - 1, fromDays: 24, fromChallenges: 10 })).toBe(false);
+    expect(
+      isBadgeUnlocked({
+        total: BADGE_THRESHOLD,
+        fromDays: 25,
+        fromChallenges: 10,
+      }),
+    ).toBe(true);
+    expect(
+      isBadgeUnlocked({
+        total: BADGE_THRESHOLD - 1,
+        fromDays: 24,
+        fromChallenges: 10,
+      }),
+    ).toBe(false);
   });
 });

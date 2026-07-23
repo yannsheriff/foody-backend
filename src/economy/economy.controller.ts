@@ -30,7 +30,9 @@ export class EconomyController {
   }
 
   @Post('shop/freeze')
-  @ApiOperation({ summary: 'Acheter un gel de flamme (70 🪙, max 1 en réserve)' })
+  @ApiOperation({
+    summary: 'Acheter un gel de flamme (70 🪙, max 1 en réserve)',
+  })
   @ApiResponse({ status: 201, type: WalletDto })
   buyFreeze(@Req() req: AuthedRequest): Promise<WalletDto> {
     return this.economy.buyFreeze(req.user.id);

@@ -14,6 +14,7 @@ import {
   CollectionDto,
   RewardsDto,
   SelectWeeklyDto,
+  SetIntentionDto,
 } from './dto/rewards.dto';
 
 interface AuthedRequest extends Request {
@@ -43,13 +44,32 @@ export class RewardsController {
       'Choisir son défi de la semaine parmi les 2 offres (verrouillé jusqu’à dimanche, objectif proraté)',
   })
   @ApiResponse({ status: 201, type: ActiveWeeklyDto })
-  @ApiResponse({ status: 400, description: 'Ce défi n’est pas proposé cette semaine' })
-  @ApiResponse({ status: 409, description: 'Un défi est déjà choisi cette semaine' })
+  @ApiResponse({
+    status: 400,
+    description: 'Ce défi n’est pas proposé cette semaine',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Un défi est déjà choisi cette semaine',
+  })
   selectWeekly(
     @Req() req: AuthedRequest,
     @Body() body: SelectWeeklyDto,
   ): Promise<ActiveWeeklyDto> {
     return this.rewards.selectWeekly(req.user.id, body.challengeId);
+  }
+
+  @Post('intention')
+  @ApiOperation({
+    summary:
+      "Synchroniser l'intention d'onboarding (pondère le tirage des défis)",
+  })
+  @ApiResponse({ status: 201 })
+  setIntention(
+    @Req() req: AuthedRequest,
+    @Body() body: SetIntentionDto,
+  ): Promise<{ ok: true }> {
+    return this.rewards.setIntention(req.user.id, body.intention);
   }
 
   @Get('collection')

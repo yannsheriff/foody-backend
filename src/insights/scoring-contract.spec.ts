@@ -76,9 +76,17 @@ const hasFrontend = fs.existsSync(MEAL_LEVELS_PATH);
 
       const canonical = [
         // [matin, midi, soir (kebab wire)] — le backend reçoit la version Prisma.
-        { meals: ['leger', 'normal', 'tres-copieux'], snack: 0.5, cheat: 'evening' },
+        {
+          meals: ['leger', 'normal', 'tres-copieux'],
+          snack: 0.5,
+          cheat: 'evening',
+        },
         { meals: ['copieux', 'copieux', 'leger'], snack: 0, cheat: 'morning' },
-        { meals: ['leger', 'normal', 'tres-copieux'], snack: 0.5, cheat: 'morning' }, // non lourd → sans effet
+        {
+          meals: ['leger', 'normal', 'tres-copieux'],
+          snack: 0.5,
+          cheat: 'morning',
+        }, // non lourd → sans effet
         { meals: ['leger', 'normal', 'tres-copieux'], snack: 0.5, cheat: null },
       ];
       for (const c of canonical) {

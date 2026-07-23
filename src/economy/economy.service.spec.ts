@@ -19,7 +19,9 @@ function mkDay(date: Date) {
 }
 function consecutiveOnTimeDays(n: number) {
   const base = Date.UTC(2026, 5, 10, 12); // 10 juin 2026
-  return Array.from({ length: n }, (_, i) => mkDay(new Date(base - i * 86_400_000)));
+  return Array.from({ length: n }, (_, i) =>
+    mkDay(new Date(base - i * 86_400_000)),
+  );
 }
 
 function mkService(
@@ -33,10 +35,14 @@ function mkService(
 ) {
   // Ledger dynamique : findMany reflète les créations (les débits d'achat
   // impactent le solde relu par getWallet après un achat).
-  const store: Record<string, unknown>[] = [...((over.txns as Record<string, unknown>[]) ?? [])];
+  const store: Record<string, unknown>[] = [
+    ...((over.txns as Record<string, unknown>[]) ?? []),
+  ];
   let id = store.length + 1;
   const prisma = {
-    weeklyChallenge: { findMany: jest.fn().mockResolvedValue(over.weekly ?? []) },
+    weeklyChallenge: {
+      findMany: jest.fn().mockResolvedValue(over.weekly ?? []),
+    },
     userBadge: { findMany: jest.fn().mockResolvedValue(over.badges ?? []) },
     days: {
       findMany: jest.fn().mockResolvedValue(over.days ?? []),
@@ -111,7 +117,13 @@ describe('EconomyService.loadAndSync — crédits lazy', () => {
         { id: 3, user_id: 1, amount: 30, reason: 'welcome', ref: 'welcome' },
       ],
       consumptions: [
-        { id: 1, user_id: 1, day: new Date(), consumed_at: new Date(), seen: false },
+        {
+          id: 1,
+          user_id: 1,
+          day: new Date(),
+          consumed_at: new Date(),
+          seen: false,
+        },
       ],
     });
     const state = await service.loadAndSync(1);
@@ -137,12 +149,16 @@ function todayRow(over: Record<string, unknown> = {}) {
     ...over,
   };
 }
-const welcome100 = [{ id: 1, user_id: 1, amount: 100, reason: 'welcome', ref: 'welcome' }];
+const welcome100 = [
+  { id: 1, user_id: 1, amount: 100, reason: 'welcome', ref: 'welcome' },
+];
 
 describe('EconomyService — boutique', () => {
   it('buyFreeze : refuse si solde insuffisant', async () => {
     const { service } = mkService({
-      txns: [{ id: 1, user_id: 1, amount: 30, reason: 'welcome', ref: 'welcome' }],
+      txns: [
+        { id: 1, user_id: 1, amount: 30, reason: 'welcome', ref: 'welcome' },
+      ],
     });
     await expect(service.buyFreeze(1)).rejects.toThrow('Solde insuffisant');
   });
@@ -174,7 +190,10 @@ describe('EconomyService — boutique', () => {
     const wallet = await service.buyCheatMeal(1);
     expect(prisma.coinTransaction.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ reason: 'buy_cheat_meal', amount: -25 }),
+        data: expect.objectContaining({
+          reason: 'buy_cheat_meal',
+          amount: -25,
+        }),
       }),
     );
     expect(prisma.days.update).not.toHaveBeenCalled();
@@ -184,7 +203,9 @@ describe('EconomyService — boutique', () => {
 
   it('buyCheatMeal : refuse si solde insuffisant', async () => {
     const { service } = mkService({
-      txns: [{ id: 1, user_id: 1, amount: 10, reason: 'welcome', ref: 'welcome' }],
+      txns: [
+        { id: 1, user_id: 1, amount: 10, reason: 'welcome', ref: 'welcome' },
+      ],
     });
     await expect(service.buyCheatMeal(1)).rejects.toThrow('Solde insuffisant');
   });
@@ -231,7 +252,9 @@ describe('EconomyService — boutique', () => {
     // réelle descendrait ; ici on vérifie surtout l'absence de nouveau débit.
     expect(
       (prisma.coinTransaction.create as jest.Mock).mock.calls.filter(
-        (c) => (c[0] as { data: { reason: string } }).data.reason === 'buy_cheat_meal',
+        (c) =>
+          (c[0] as { data: { reason: string } }).data.reason ===
+          'buy_cheat_meal',
       ),
     ).toHaveLength(0);
   });

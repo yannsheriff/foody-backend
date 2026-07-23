@@ -7,7 +7,10 @@ export class FreezeConsumedDto {
   })
   day: string;
 
-  @ApiProperty({ description: 'Gels restant en réserve après conso', example: 0 })
+  @ApiProperty({
+    description: 'Gels restant en réserve après conso',
+    example: 0,
+  })
   stock: number;
 }
 

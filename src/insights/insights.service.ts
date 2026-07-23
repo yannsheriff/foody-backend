@@ -3,7 +3,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Days } from '@prisma/client';
 import {
   computeDayScore,
-  countsForStreak,
   isDayFullyTracked,
   startOfDay,
   ymd,

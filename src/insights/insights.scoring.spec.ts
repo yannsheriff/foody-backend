@@ -98,11 +98,15 @@ describe('computeDayScore — cheat meal (Phase 3)', () => {
   it('un repas lourd cheaté est scoré comme un normal', () => {
     // 2,25 + 1,5 + 0 + snack(+1) = 4,8 → cheat soir : 2,25 + 1,5 + 1,5 + 1 = 6,3
     expect(computeDayScore(mkDay(base))).toBe(4.8);
-    expect(computeDayScore(mkDay({ ...base, cheat_slot: 'evening' }))).toBe(6.3);
+    expect(computeDayScore(mkDay({ ...base, cheat_slot: 'evening' }))).toBe(
+      6.3,
+    );
   });
 
   it('un cheat sur un repas non lourd ne change rien (jamais de baisse)', () => {
-    expect(computeDayScore(mkDay({ ...base, cheat_slot: 'morning' }))).toBe(4.8);
+    expect(computeDayScore(mkDay({ ...base, cheat_slot: 'morning' }))).toBe(
+      4.8,
+    );
   });
 
   it('cheat_slot null = score inchangé', () => {

@@ -8,15 +8,19 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BADGES } from '../insights/insights.constants';
 import { ymd } from '../insights/insights.scoring';
 import {
-  ACCESSIBLE_BAND,
-  AMBITIOUS_BAND,
   FLAVOR_POINTS,
+  INTENTION_KINDS,
   WeeklyChallengeDef,
   WeeklyFlavor,
   WeeklyKind,
   weeklyById,
   WEEKLY_CATALOG,
 } from './weekly-catalog.constants';
+import {
+  ACCESSIBLE_OFFSET,
+  AMBITIOUS_OFFSET,
+  computeElo,
+} from './elo.progress';
 import {
   countQualifyingDays,
   daysLeftInWeek,
@@ -51,6 +55,7 @@ interface RewardsState {
   days: Days[];
   weekly: WeeklyChallenge[];
   badges: UserBadge[];
+  intention: string | null;
 }
 
 @Injectable()
@@ -59,7 +64,10 @@ export class RewardsService {
 
   // ─── Public API ───────────────────────────────────────────
 
-  async getRewards(userId: number, now: Date = new Date()): Promise<RewardsDto> {
+  async getRewards(
+    userId: number,
+    now: Date = new Date(),
+  ): Promise<RewardsDto> {
     const state = await this.loadAndSync(userId, now);
     return {
       week: this.buildWeek(userId, state, now),
@@ -87,22 +95,38 @@ export class RewardsService {
     return this.buildAchievements(state);
   }
 
+  /** Synchronise l'intention d'onboarding (pondère le tirage — Phase 4). */
+  async setIntention(userId: number, intention: string): Promise<{ ok: true }> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { intention },
+    });
+    return { ok: true };
+  }
+
   async selectWeekly(
     userId: number,
     challengeId: string,
     now: Date = new Date(),
   ): Promise<ActiveWeeklyDto> {
     const { weekStart, weekEnd, isoWeek } = weekBounds(now);
-    const [days, weekly] = await Promise.all([
+    const [days, weekly, user] = await Promise.all([
       this.prisma.days.findMany({ where: { user_id: userId } }),
       this.prisma.weeklyChallenge.findMany({ where: { user_id: userId } }),
+      this.prisma.user.findUnique({ where: { id: userId } }),
     ]);
 
     if (weekly.some((w) => w.iso_week === isoWeek)) {
       throw new ConflictException('Un défi est déjà choisi cette semaine');
     }
 
-    const offers = this.generateOffers(userId, isoWeek, weekly, now);
+    const offers = this.generateOffers(
+      userId,
+      isoWeek,
+      weekly,
+      now,
+      user?.intention ?? null,
+    );
     const match = offers.find((o) => o.def.id === challengeId);
     if (!match) {
       throw new BadRequestException("Ce défi n'est pas proposé cette semaine");
@@ -125,18 +149,16 @@ export class RewardsService {
 
   // ─── Loading + lazy sync ──────────────────────────────────
 
-  private async loadAndSync(
-    userId: number,
-    now: Date,
-  ): Promise<RewardsState> {
-    const [days, rawWeekly, rawBadges] = await Promise.all([
+  private async loadAndSync(userId: number, now: Date): Promise<RewardsState> {
+    const [days, rawWeekly, rawBadges, user] = await Promise.all([
       this.prisma.days.findMany({ where: { user_id: userId } }),
       this.prisma.weeklyChallenge.findMany({ where: { user_id: userId } }),
       this.prisma.userBadge.findMany({ where: { user_id: userId } }),
+      this.prisma.user.findUnique({ where: { id: userId } }),
     ]);
     const weekly = await this.resolveElapsed(userId, rawWeekly, days, now);
     const badges = await this.syncBadges(userId, days, weekly, rawBadges, now);
-    return { days, weekly, badges };
+    return { days, weekly, badges, intention: user?.intention ?? null };
   }
 
   // Flip elapsed `active` weeks to won/lost, crediting reward points. Frozen
@@ -214,7 +236,11 @@ export class RewardsService {
     for (const c of toCreate) {
       try {
         const created = await this.prisma.userBadge.create({
-          data: { user_id: userId, badge_id: c.badge_id, unlocked_at: c.unlocked_at },
+          data: {
+            user_id: userId,
+            badge_id: c.badge_id,
+            unlocked_at: c.unlocked_at,
+          },
         });
         out.push(created);
       } catch (e) {
@@ -230,7 +256,10 @@ export class RewardsService {
     const month = now.getUTCMonth() + 1;
     const list = [{ year, month }];
     if (now.getUTCDate() <= MONTHLY_GRACE_DAYS) {
-      const prev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
+      const prev =
+        month === 1
+          ? { year: year - 1, month: 12 }
+          : { year, month: month - 1 };
       list.push(prev);
     }
     return list;
@@ -238,42 +267,86 @@ export class RewardsService {
 
   // ─── Offers ───────────────────────────────────────────────
 
+  // Tirage adaptatif (Phase 4) : bandes centrées sur l'ELO rejoué (montée
+  // lente, descente rapide — « toujours faisable »), pondération douce par la
+  // saison du mois (×2) et l'intention d'onboarding (×2, cumulable). Toujours
+  // déterministe par hash(userId, isoWeek) — mêmes offres toute la semaine.
   private generateOffers(
     userId: number,
     isoWeek: string,
     weekly: WeeklyChallenge[],
     now: Date,
+    intention: string | null,
   ): { def: WeeklyChallengeDef; flavor: WeeklyFlavor }[] {
     const { weekStart } = weekBounds(now);
     const prevIso = isoWeekOf(new Date(weekStart.getTime() - 1));
     const lastId = weekly.find((w) => w.iso_week === prevIso)?.challenge_id;
     const boosted = seasonForMonth(now.getUTCMonth() + 1).boostedKinds;
+    const preferred = intention ? (INTENTION_KINDS[intention] ?? []) : [];
     // Weekend needs both Sat and Sun still ahead (feasible only Mon→Fri).
     const weekendFeasible = daysLeftInWeek(now) >= 3;
+
+    const elo = computeElo(weekly, now);
+    const bandFor = (offset: readonly [number, number]): [number, number] => [
+      elo + offset[0],
+      elo + offset[1],
+    ];
+
+    const baseFilter = (excludeKind: WeeklyKind | null) => {
+      let pool = WEEKLY_CATALOG.filter((c) => c.id !== lastId);
+      if (!weekendFeasible) pool = pool.filter((c) => c.kind !== 'weekend');
+      if (excludeKind) pool = pool.filter((c) => c.kind !== excludeKind);
+      return pool;
+    };
 
     const poolFor = (
       band: readonly [number, number],
       excludeKind: WeeklyKind | null,
     ): WeeklyChallengeDef[] => {
-      let pool = WEEKLY_CATALOG.filter(
-        (c) => c.rating >= band[0] && c.rating <= band[1] && c.id !== lastId,
+      const base = baseFilter(excludeKind);
+      const inBand = base.filter(
+        (c) => c.rating >= band[0] && c.rating <= band[1],
       );
-      if (!weekendFeasible) pool = pool.filter((c) => c.kind !== 'weekend');
-      if (excludeKind) pool = pool.filter((c) => c.kind !== excludeKind);
-      return pool;
-    };
-    const pick = (pool: WeeklyChallengeDef[], salt: string): WeeklyChallengeDef => {
-      // Prefer the season's themed families, fall back to the whole pool.
-      const themed = pool.filter((c) => boosted.includes(c.kind));
-      const chosen = themed.length ? themed : pool;
-      return chosen[hashSeed(`${userId}:${isoWeek}:${salt}`) % chosen.length];
+      if (inBand.length > 0) return inBand;
+      // Bande vide (bas/haut du catalogue, exclusions) : les 4 défis les plus
+      // proches du centre de bande — jamais d'offre manquante.
+      const center = (band[0] + band[1]) / 2;
+      return [...base]
+        .sort(
+          (a, b) => Math.abs(a.rating - center) - Math.abs(b.rating - center),
+        )
+        .slice(0, 4);
     };
 
-    const accessible = pick(poolFor(ACCESSIBLE_BAND, null), 'accessible');
+    // Tirage pondéré déterministe : saison ×2, intention ×2 (cumulable ×4) —
+    // favorise sans jamais exclure (fini le « saison sinon rien »).
+    const pick = (
+      pool: WeeklyChallengeDef[],
+      salt: string,
+    ): WeeklyChallengeDef => {
+      const weights = pool.map(
+        (c) =>
+          (boosted.includes(c.kind) ? 2 : 1) *
+          (preferred.includes(c.kind) ? 2 : 1),
+      );
+      const total = weights.reduce((s, w) => s + w, 0);
+      let roll = hashSeed(`${userId}:${isoWeek}:${salt}`) % total;
+      for (let i = 0; i < pool.length; i++) {
+        roll -= weights[i];
+        if (roll < 0) return pool[i];
+      }
+      return pool[pool.length - 1];
+    };
+
+    const accessible = pick(
+      poolFor(bandFor(ACCESSIBLE_OFFSET), null),
+      'accessible',
+    );
     // The ambitious offer must be a DIFFERENT family than the accessible one —
     // a real choice, pas « 3 vs 6 jours du même défi ».
-    let ambitiousPool = poolFor(AMBITIOUS_BAND, accessible.kind);
-    if (ambitiousPool.length === 0) ambitiousPool = poolFor(AMBITIOUS_BAND, null);
+    let ambitiousPool = poolFor(bandFor(AMBITIOUS_OFFSET), accessible.kind);
+    if (ambitiousPool.length === 0)
+      ambitiousPool = poolFor(bandFor(AMBITIOUS_OFFSET), null);
     const ambitious = pick(ambitiousPool, 'ambitious');
 
     return [
@@ -321,8 +394,9 @@ export class RewardsService {
     const jr = this.latestResolved(state.weekly);
     const justResolved = jr ? this.toJustResolved(jr) : null;
     const current =
-      state.weekly.find((w) => w.iso_week === isoWeek && w.status === 'active') ??
-      null;
+      state.weekly.find(
+        (w) => w.iso_week === isoWeek && w.status === 'active',
+      ) ?? null;
 
     if (current) {
       return {
@@ -338,6 +412,7 @@ export class RewardsService {
       isoWeek,
       state.weekly,
       now,
+      state.intention,
     ).map(({ def, flavor }) => ({
       id: def.id,
       emoji: def.emoji,
@@ -383,7 +458,8 @@ export class RewardsService {
     // Ne montrer que les mois qui ont pu exister : après le lancement de la
     // feature ET après l'arrivée de l'utilisateur (les mois d'avant n'ont jamais
     // été gagnables → pas de tuile « ratée » factice pour janvier-juin 2026).
-    const launchAbs = BADGE_FEATURE_LAUNCH.year * 12 + BADGE_FEATURE_LAUNCH.month;
+    const launchAbs =
+      BADGE_FEATURE_LAUNCH.year * 12 + BADGE_FEATURE_LAUNCH.month;
     let userAbs = year * 12 + month;
     for (const d of state.days) {
       const dt = new Date(d.date);
