@@ -36,15 +36,25 @@ interface EcoOver {
 }
 
 // Mock EconomyService — par défaut : pas de gel, pas de conso (comportement
-// historique de la flamme, inchangé).
+// historique de la flamme, inchangé). Un gel en stock est réputé acheté il y a
+// longtemps (l'appariement FIFO conso→achat exige assez de buy_freeze).
 function mkEconomy(over: EcoOver = {}) {
   const consumptions = over.consumptions ?? [];
+  const stock = over.stock ?? 0;
+  const txns = Array.from({ length: stock + consumptions.length }, (_, i) => ({
+    id: i + 1,
+    user_id: 1,
+    amount: -70,
+    reason: 'buy_freeze',
+    ref: `buy-${i}`,
+    created_at: new Date(Date.UTC(2026, 0, 1 + i)),
+  }));
   return {
     loadAndSync: jest.fn().mockResolvedValue({
-      txns: [],
+      txns,
       consumptions,
       balance: 0,
-      freezeStock: over.stock ?? 0,
+      freezeStock: stock,
     }),
     consumeFreeze: jest.fn().mockResolvedValue(undefined),
     unseenFreeze: jest.fn().mockResolvedValue(null),

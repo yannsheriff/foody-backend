@@ -18,6 +18,11 @@ import {
 //   consomme rien ;
 // - on ne consomme que si le pont AUGMENTE la série courante (jamais de gel
 //   brûlé pour rien) ;
+// - le gel est une ASSURANCE, pas un raccommodage : il ne couvre qu'un jour
+//   perdu pendant qu'il était en réserve (graceDeadline ≥ date d'achat).
+//   Sans cette borne, acheter un gel alors que la série courante a un trou
+//   ancien à sa frontière le consommait instantanément pour rallonger la
+//   flamme vers le passé (bug vécu 23/07/2026, trou du 3 juin) ;
 // - 1 gel couvre exactement 1 jour (stock max 1).
 
 /** Jours (ymd UTC) réellement on-time — dédupliqués. */
@@ -84,16 +89,18 @@ export function recordStreakWithBridges(
 
 /**
  * Le jour manqué qu'un gel en stock devrait couvrir MAINTENANT — ou null.
- * Balaye les ~60 derniers jours : premier jour non couvert, past-grace, dont le
- * pont augmente la série courante. (Stock max 1 → un seul candidat suffit.)
+ * Balaye les ~60 derniers jours : premier jour non couvert, past-grace, perdu
+ * APRÈS l'achat du gel (`purchasedAt`), dont le pont augmente la série
+ * courante. (Stock max 1 → un seul candidat suffit.)
  */
 export function findBridgeCandidate(
   days: Days[],
   bridges: Set<string>,
   stock: number,
+  purchasedAt: Date | null,
   now: Date,
 ): Date | null {
-  if (stock <= 0) return null;
+  if (stock <= 0 || !purchasedAt) return null;
   const onTime = onTimeDays(days);
   const base = currentStreakWithBridges(days, bridges, now);
   const todayStart = startOfDay(now);
@@ -103,6 +110,10 @@ export function findBridgeCandidate(
     const key = ymd(day);
     if (onTime.has(key) || bridges.has(key)) continue;
     if (now.getTime() <= graceDeadline(day).getTime()) continue; // encore rattrapable
+    // Le jour doit avoir été perdu PENDANT que le gel était en réserve : sa
+    // fenêtre de rattrapage doit se fermer après l'achat. Un trou déjà
+    // consommé avant l'achat reste perdu (« une flamme perdue est perdue »).
+    if (graceDeadline(day).getTime() < purchasedAt.getTime()) continue;
     // Le pont doit RACCORDER une vraie série : le jour précédent compte déjà.
     // Sans ça, un pont en queue de chaîne ajouterait « +1 gratuit » — un gel
     // brûlé sans rien relier.

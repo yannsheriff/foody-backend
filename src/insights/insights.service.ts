@@ -13,6 +13,7 @@ import {
   findBridgeCandidate,
   recordStreakWithBridges,
 } from '../economy/freeze.progress';
+import { activeFreezePurchasedAt } from '../economy/wallet';
 import { StreakDto } from './dto/streak.dto';
 import { RecordsDto } from './dto/records.dto';
 import { StatsDto } from './dto/stats.dto';
@@ -39,7 +40,17 @@ export class InsightsService {
       economy.consumptions.map((c) => ymd(new Date(c.day))),
     );
     let stock = economy.freezeStock;
-    const candidate = findBridgeCandidate(days, bridges, stock, now);
+    const purchasedAt = activeFreezePurchasedAt(
+      economy.txns,
+      economy.consumptions,
+    );
+    const candidate = findBridgeCandidate(
+      days,
+      bridges,
+      stock,
+      purchasedAt,
+      now,
+    );
     if (candidate) {
       await this.economy.consumeFreeze(userId, candidate);
       bridges.add(ymd(candidate));

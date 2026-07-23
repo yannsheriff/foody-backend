@@ -1,5 +1,9 @@
 import { CoinTransaction, FreezeConsumption } from '@prisma/client';
-import { computeBalance, freezeStock } from './wallet';
+import {
+  activeFreezePurchasedAt,
+  computeBalance,
+  freezeStock,
+} from './wallet';
 
 const tx = (over: Partial<CoinTransaction>): CoinTransaction =>
   ({
@@ -50,5 +54,31 @@ describe('freezeStock', () => {
   });
   it('counts a fresh purchase', () => {
     expect(freezeStock([tx({ reason: 'buy_freeze' })], [])).toBe(1);
+  });
+});
+
+describe('activeFreezePurchasedAt', () => {
+  const at = (iso: string) => new Date(iso);
+  it('FIFO : la (n+1)ᵉ conso use le (n+1)ᵉ achat', () => {
+    const txns = [
+      tx({ reason: 'buy_freeze', created_at: at('2026-07-20T10:00:00Z') }),
+      tx({ reason: 'challenge_won', created_at: at('2026-07-21T10:00:00Z') }),
+      tx({ reason: 'buy_freeze', created_at: at('2026-07-22T10:00:00Z') }),
+    ];
+    expect(activeFreezePurchasedAt(txns, [])?.toISOString()).toBe(
+      '2026-07-20T10:00:00.000Z',
+    );
+    expect(
+      activeFreezePurchasedAt(txns, [consumption()])?.toISOString(),
+    ).toBe('2026-07-22T10:00:00.000Z');
+  });
+  it('null sans gel en réserve', () => {
+    expect(activeFreezePurchasedAt([], [])).toBeNull();
+    expect(
+      activeFreezePurchasedAt(
+        [tx({ reason: 'buy_freeze', created_at: at('2026-07-20T10:00:00Z') })],
+        [consumption()],
+      ),
+    ).toBeNull();
   });
 });
