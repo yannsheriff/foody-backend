@@ -311,6 +311,65 @@ export function weeklyById(id: string): WeeklyChallengeDef | undefined {
   return WEEKLY_CATALOG.find((c) => c.id === id);
 }
 
+// Titre accordé à l'objectif réellement figé. Le titre canonique du catalogue
+// embarque `total` — quand l'objectif est proraté (choix en cours de semaine),
+// il faut régénérer un titre cohérent (« 2 dîners légers » alors que la cible
+// est 1 = incompréhensible). Un template par kind, accord singulier/pluriel.
+export function titleForTarget(
+  def: WeeklyChallengeDef,
+  target: number,
+): string {
+  if (target === def.total) return def.title;
+  const s = target > 1 ? 's' : '';
+  switch (def.kind) {
+    case 'saisie':
+      return `Saisir tes 3 repas, ${target} jour${s} cette semaine`;
+    case 'soir-leger':
+      return `${target} dîner${s} léger${s} cette semaine`;
+    case 'grignotage':
+      return `${target} jour${s} sans grignotage cette semaine`;
+    case 'copieux':
+      return `${target} jour${s} sans repas lourd cette semaine`;
+    case 'sport':
+      return `${target} séance${s} de sport cette semaine`;
+    case 'note':
+      return `Atteindre ${def.minScore}+ sur ${target} jour${s} cette semaine`;
+    case 'parfait':
+      return target === 1
+        ? 'Une journée sans fausse note'
+        : `${target} journées parfaites`;
+    case 'combo':
+      return `Le corps et l'assiette, ${target} fois`;
+    case 'volume':
+      return `${target} repas léger${s} cette semaine`;
+    case 'weekend':
+      return def.title; // non prorable — jamais atteint
+  }
+}
+
+// Même accord pour les descriptions qui citent le compte (combo / volume /
+// parfait). Les autres kinds n'ont pas de description chiffrée.
+export function descriptionForTarget(
+  def: WeeklyChallengeDef,
+  target: number,
+): string | null {
+  if (target === def.total) return def.description ?? null;
+  switch (def.kind) {
+    case 'combo':
+      return `Du sport ET un dîner léger le même jour — ${target} jour${
+        target > 1 ? 's' : ''
+      } cette semaine.`;
+    case 'volume':
+      return `Des repas légers ou très légers — ${target} en tout, peu importe la répartition.`;
+    case 'parfait':
+      return target === 1
+        ? 'Une journée qui coche tout : tes 3 repas sans excès (aucun copieux), du sport, et le grignotage au minimum.'
+        : `${target} journées qui cochent tout : repas sans excès, sport, grignotage au minimum.`;
+    default:
+      return def.description ?? null;
+  }
+}
+
 export type WeeklyFlavor = 'accessible' | 'ambitious';
 
 // Kinds mis en avant par intention d'onboarding — miroir de Intention.kinds

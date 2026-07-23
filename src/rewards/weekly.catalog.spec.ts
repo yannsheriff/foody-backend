@@ -1,5 +1,7 @@
 import { Days } from '@prisma/client';
 import {
+  descriptionForTarget,
+  titleForTarget,
   WEEKLY_CATALOG,
   WeeklyChallengeDef,
   weeklyById,
@@ -95,6 +97,43 @@ describe('WEEKLY_CATALOG · every entry is completable and non-trivial', () => {
       ).toBe(false);
     });
   }
+});
+
+describe('titleForTarget · le titre suit l’objectif proraté', () => {
+  it('rend le titre canonique quand target = total', () => {
+    for (const def of WEEKLY_CATALOG) {
+      expect(titleForTarget(def, def.total)).toBe(def.title);
+      expect(descriptionForTarget(def, def.total)).toBe(
+        def.description ?? null,
+      );
+    }
+  });
+
+  it('cite l’objectif proraté (jamais le total du catalogue)', () => {
+    for (const def of WEEKLY_CATALOG) {
+      if (def.kind === 'weekend') continue; // non prorable
+      for (let target = 1; target < def.total; target++) {
+        const title = titleForTarget(def, target);
+        // Le compte affiché est celui de l'objectif figé…
+        if (!(def.kind === 'parfait' && target === 1)) {
+          expect(title).toContain(String(target));
+        }
+        // …et le total canonique n'y traîne plus (hors « 3 repas » de saisie
+        // et le seuil de note, qui ne sont pas des comptes de jours).
+        const stripped = title
+          .replace('Saisir tes 3 repas', '')
+          .replace(/\d+\+/, '');
+        expect(stripped).not.toContain(String(def.total));
+      }
+    }
+  });
+
+  it('accorde le singulier', () => {
+    const soir = weeklyById('w-soir-2')!;
+    expect(titleForTarget(soir, 1)).toBe('1 dîner léger cette semaine');
+    const sport = weeklyById('w-sport-2')!;
+    expect(titleForTarget(sport, 1)).toBe('1 séance de sport cette semaine');
+  });
 });
 
 describe('weeklyById', () => {

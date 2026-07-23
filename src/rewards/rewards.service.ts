@@ -8,8 +8,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BADGES } from '../insights/insights.constants';
 import { ymd } from '../insights/insights.scoring';
 import {
+  descriptionForTarget,
   FLAVOR_POINTS,
   INTENTION_KINDS,
+  titleForTarget,
   WeeklyChallengeDef,
   WeeklyFlavor,
   WeeklyKind,
@@ -378,7 +380,7 @@ export class RewardsService {
     const def = weeklyById(row.challenge_id);
     return {
       challengeId: row.challenge_id,
-      title: def?.title ?? row.challenge_id,
+      title: def ? titleForTarget(def, row.target) : row.challenge_id,
       emoji: def?.emoji ?? '🏅',
       flavor: row.flavor,
       isoWeek: row.iso_week,
@@ -413,17 +415,20 @@ export class RewardsService {
       state.weekly,
       now,
       state.intention,
-    ).map(({ def, flavor }) => ({
-      id: def.id,
-      emoji: def.emoji,
-      title: def.title,
-      description: def.description ?? null,
-      kind: def.kindLabel,
-      kindId: def.kind,
-      flavor,
-      target: this.targetFor(def, now),
-      rewardPoints: FLAVOR_POINTS[flavor],
-    }));
+    ).map(({ def, flavor }) => {
+      const target = this.targetFor(def, now);
+      return {
+        id: def.id,
+        emoji: def.emoji,
+        title: titleForTarget(def, target),
+        description: descriptionForTarget(def, target),
+        kind: def.kindLabel,
+        kindId: def.kind,
+        flavor,
+        target,
+        rewardPoints: FLAVOR_POINTS[flavor],
+      };
+    });
     return { challenge: null, offers, isoWeek, daysLeft, justResolved };
   }
 
@@ -525,8 +530,8 @@ export class RewardsService {
     return {
       id: def.id,
       emoji: def.emoji,
-      title: def.title,
-      description: def.description ?? null,
+      title: titleForTarget(def, row.target),
+      description: descriptionForTarget(def, row.target),
       kind: def.kindLabel,
       kindId: def.kind,
       flavor,
