@@ -13,7 +13,7 @@ import {
   MAX_FREEZE_STOCK,
   SHOP_PRICES,
 } from './economy.constants';
-import { computeBalance, freezeStock } from './wallet';
+import { cheatMealStock, computeBalance, freezeStock } from './wallet';
 import { WalletDto } from './dto/wallet.dto';
 
 interface ExpectedCredit {
@@ -27,6 +27,7 @@ export interface EconomyState {
   consumptions: FreezeConsumption[];
   balance: number;
   freezeStock: number;
+  cheatStock: number;
 }
 
 @Injectable()
@@ -35,7 +36,11 @@ export class EconomyService {
 
   async getWallet(userId: number): Promise<WalletDto> {
     const state = await this.loadAndSync(userId);
-    return { balance: state.balance, freezeStock: state.freezeStock };
+    return {
+      balance: state.balance,
+      freezeStock: state.freezeStock,
+      cheatStock: state.cheatStock,
+    };
   }
 
   // ─── Boutique (achats) ───────────────────────────────────────
@@ -61,16 +66,40 @@ export class EconomyService {
   }
 
   /**
-   * Achète-et-applique un cheat meal sur la journée EN COURS, sur le créneau
-   * choisi (qui doit être un repas lourd non encore réparé). Débite 25 🪙 et
-   * pose Days.cheat_slot (le scoring le compte alors comme un « normal »).
+   * Achète un cheat meal EN RÉSERVE (il s'accumule, comme le gel). Débite 25 🪙.
+   * L'application sur un repas se fait ensuite via useCheatMeal.
    */
-  async buyCheatMeal(
+  async buyCheatMeal(userId: number): Promise<WalletDto> {
+    const state = await this.loadAndSync(userId);
+    if (state.balance < SHOP_PRICES.cheatMeal) {
+      throw new BadRequestException('Solde insuffisant');
+    }
+    await this.prisma.coinTransaction.create({
+      data: {
+        user_id: userId,
+        amount: -SHOP_PRICES.cheatMeal,
+        reason: 'buy_cheat_meal',
+        ref: new Date().toISOString(), // un achat = une ligne unique
+      },
+    });
+    return this.getWallet(userId);
+  }
+
+  /**
+   * Consomme un cheat meal de la réserve pour réparer un repas lourd de la
+   * journée EN COURS (créneau choisi). Aucun débit ici — l'achat a déjà payé.
+   * Pose Days.cheat_slot (le scoring le compte alors comme un « normal »).
+   */
+  async useCheatMeal(
     userId: number,
     slot: 'morning' | 'afternoon' | 'evening',
     now: Date = new Date(),
   ): Promise<WalletDto> {
     const todayKey = ymd(startOfDay(now));
+    const state = await this.loadAndSync(userId);
+    if (state.cheatStock < 1) {
+      throw new BadRequestException('Aucun cheat meal en réserve');
+    }
     const days = await this.prisma.days.findMany({ where: { user_id: userId } });
     const today = days.find((d) => ymd(new Date(d.date)) === todayKey);
     if (!today) {
@@ -83,32 +112,10 @@ export class EconomyService {
     if (score !== 'copieux' && score !== 'tresCopieux') {
       throw new BadRequestException("Ce repas n'est pas lourd");
     }
-    const state = await this.loadAndSync(userId);
-    if (state.balance < SHOP_PRICES.cheatMeal) {
-      throw new BadRequestException('Solde insuffisant');
-    }
-    // Débit + pose du cheat, atomiques. ref = le jour → un seul cheat / jour.
-    try {
-      await this.prisma.$transaction([
-        this.prisma.coinTransaction.create({
-          data: {
-            user_id: userId,
-            amount: -SHOP_PRICES.cheatMeal,
-            reason: 'buy_cheat_meal',
-            ref: todayKey,
-          },
-        }),
-        this.prisma.days.update({
-          where: { id: today.id },
-          data: { cheat_slot: slot },
-        }),
-      ]);
-    } catch (e) {
-      if ((e as { code?: string }).code === 'P2002') {
-        throw new BadRequestException('Un repas est déjà réparé aujourd’hui');
-      }
-      throw e;
-    }
+    await this.prisma.days.update({
+      where: { id: today.id },
+      data: { cheat_slot: slot },
+    });
     return this.getWallet(userId);
   }
 
@@ -238,6 +245,7 @@ export class EconomyService {
       consumptions,
       balance: computeBalance(txns),
       freezeStock: freezeStock(txns, consumptions),
+      cheatStock: cheatMealStock(txns, days),
     };
   }
 }

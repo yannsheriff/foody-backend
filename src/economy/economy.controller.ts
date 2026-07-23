@@ -38,14 +38,23 @@ export class EconomyController {
 
   @Post('shop/cheat-meal')
   @ApiOperation({
-    summary: 'Acheter-et-appliquer un cheat meal sur un repas lourd du jour (25 🪙)',
+    summary: 'Acheter un cheat meal en réserve (25 🪙 — il s’accumule)',
   })
   @ApiResponse({ status: 201, type: WalletDto })
-  buyCheatMeal(
+  buyCheatMeal(@Req() req: AuthedRequest): Promise<WalletDto> {
+    return this.economy.buyCheatMeal(req.user.id);
+  }
+
+  @Post('cheat-meal/use')
+  @ApiOperation({
+    summary: 'Consommer un cheat meal de la réserve sur un repas lourd du jour',
+  })
+  @ApiResponse({ status: 201, type: WalletDto })
+  useCheatMeal(
     @Req() req: AuthedRequest,
     @Body() body: BuyCheatMealDto,
   ): Promise<WalletDto> {
-    return this.economy.buyCheatMeal(req.user.id, body.slot);
+    return this.economy.useCheatMeal(req.user.id, body.slot);
   }
 
   @Post('freeze/ack')

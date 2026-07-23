@@ -6,4 +6,10 @@ export class WalletDto {
 
   @ApiProperty({ example: 1, description: 'Gels de flamme en réserve (max 1)' })
   freezeStock: number;
+
+  @ApiProperty({
+    example: 2,
+    description: 'Cheat meals en réserve (achats − jours réparés)',
+  })
+  cheatStock: number;
 }

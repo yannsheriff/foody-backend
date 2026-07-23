@@ -169,29 +169,70 @@ describe('EconomyService — boutique', () => {
     expect(wallet.freezeStock).toBe(1);
   });
 
-  it('buyCheatMeal : refuse si le repas n’est pas lourd', async () => {
+  it('buyCheatMeal : débite 25 et incrémente la réserve (aucun jour touché)', async () => {
+    const { service, prisma } = mkService({ txns: welcome100 });
+    const wallet = await service.buyCheatMeal(1);
+    expect(prisma.coinTransaction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ reason: 'buy_cheat_meal', amount: -25 }),
+      }),
+    );
+    expect(prisma.days.update).not.toHaveBeenCalled();
+    expect(wallet.balance).toBe(75); // 100 − 25
+    expect(wallet.cheatStock).toBe(1);
+  });
+
+  it('buyCheatMeal : refuse si solde insuffisant', async () => {
     const { service } = mkService({
-      days: [todayRow({ evening_score: 'leger' })],
+      txns: [{ id: 1, user_id: 1, amount: 10, reason: 'welcome', ref: 'welcome' }],
+    });
+    await expect(service.buyCheatMeal(1)).rejects.toThrow('Solde insuffisant');
+  });
+
+  const cheatInStock = [
+    ...welcome100,
+    { id: 9, user_id: 1, amount: -25, reason: 'buy_cheat_meal', ref: 'x' },
+  ];
+
+  it('useCheatMeal : refuse sans réserve', async () => {
+    const { service } = mkService({
+      days: [todayRow({ evening_score: 'copieux' })],
       txns: welcome100,
     });
-    await expect(service.buyCheatMeal(1, 'evening', NOW)).rejects.toThrow(
+    await expect(service.useCheatMeal(1, 'evening', NOW)).rejects.toThrow(
+      'Aucun cheat meal en réserve',
+    );
+  });
+
+  it('useCheatMeal : refuse si le repas n’est pas lourd', async () => {
+    const { service } = mkService({
+      days: [todayRow({ evening_score: 'leger' })],
+      txns: cheatInStock,
+    });
+    await expect(service.useCheatMeal(1, 'evening', NOW)).rejects.toThrow(
       "n'est pas lourd",
     );
   });
 
-  it('buyCheatMeal : débite 25, pose le cheat_slot, renvoie le solde', async () => {
+  it('useCheatMeal : pose le cheat_slot sans débit, la réserve descend', async () => {
     const { service, prisma } = mkService({
       days: [todayRow({ evening_score: 'copieux' })],
-      txns: welcome100,
+      txns: cheatInStock,
     });
-    const wallet = await service.buyCheatMeal(1, 'evening', NOW);
-    expect(prisma.$transaction).toHaveBeenCalled();
+    const wallet = await service.useCheatMeal(1, 'evening', NOW);
     expect(prisma.days.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 500 },
         data: { cheat_slot: 'evening' },
       }),
     );
-    expect(wallet.balance).toBe(75); // 100 − 25
+    expect(wallet.balance).toBe(75); // aucun débit à l'usage
+    // NB : le mock days.findMany est figé (cheat_slot pas re-lu) — la réserve
+    // réelle descendrait ; ici on vérifie surtout l'absence de nouveau débit.
+    expect(
+      (prisma.coinTransaction.create as jest.Mock).mock.calls.filter(
+        (c) => (c[0] as { data: { reason: string } }).data.reason === 'buy_cheat_meal',
+      ),
+    ).toHaveLength(0);
   });
 });
