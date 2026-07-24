@@ -116,7 +116,7 @@ export class WeekSectionDto {
 // ─── Month section ──────────────────────────────────────────
 export class MonthlyBadgeRefDto {
   @ApiProperty({ example: 'season-2026-07' }) id!: string;
-  @ApiProperty({ example: 'À l’ombre des tilleuls' }) title!: string;
+  @ApiProperty({ example: 'Défi juillet' }) title!: string;
   @ApiProperty({ example: '🌳' }) emoji!: string;
   @ApiProperty({ example: false }) unlocked!: boolean;
 }
@@ -140,7 +140,7 @@ export class RewardsDto {
 export class MonthlyBadgeTileDto {
   @ApiProperty({ example: 'season-2026-07' }) id!: string;
   @ApiProperty({ example: 7 }) month!: number;
-  @ApiProperty({ example: 'À l’ombre des tilleuls' }) title!: string;
+  @ApiProperty({ example: 'Défi juillet' }) title!: string;
   @ApiProperty({ example: '🌳' }) emoji!: string;
   @ApiProperty({
     example: 'Le badge de juillet. Tenir le cap sous la chaleur.',
